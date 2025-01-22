@@ -1,4 +1,4 @@
-#' PAckage \code{shapeshiftr}
+#' Package \code{shapeshiftr}
 #' 
 #' Automated pipeline for shape manipulation and data transforms
 #' 
@@ -10,5 +10,5 @@
 #' @docType package
 #' @name shapeshiftR
 #' 
-#' @import stats utils data.table magrittr
+#' @import stats utils data.table magrittr zoo
 NULL
