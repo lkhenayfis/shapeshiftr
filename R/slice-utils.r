@@ -6,7 +6,7 @@ extract_lags <- function(data, target, regressors, L, center) {
     out <- lapply(seq_along(vars), function(i) {
         L_i <- L[[i]]
         var <- vars[i]
-        data[center - L_i][[var]]
+        list(data[center - L_i][[var]])
     })
     names(out) <- paste0("lagged_", vars)
 
@@ -14,7 +14,7 @@ extract_lags <- function(data, target, regressors, L, center) {
 }
 
 extract_leads <- function(data, target, H, center) {
-    out <- list(data[center + H][[target]])
+    out <- list(list(data[center + H][[target]]))
     names(out) <- paste0("lead_", target)
 
     return(out)
