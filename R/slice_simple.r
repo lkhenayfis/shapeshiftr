@@ -1,26 +1,26 @@
 
-parse_simple_slice_args <- function(data, index_by, target, regressors, L, H, start, step) {
+parse_simple_slice_args <- function(data, index_by, variables, L, start, step, names) {
 
-    L <- parse_lag_times(L, length(regressors))
-    H <- parse_lead_times(H)
-    start <- parse_start_time(start, L)
-    check_zero_lead_lag(L, H)
-    check_column_names(data, index_by, target, regressors)
+    check_index_column(data, index_by)
+    variables <- parse_variables(data, index_by, NULL, variables)
+    sf    <- guess_sample_freq(data, index_by)
+    L     <- parse_laglead_times(L, variables, sf)
+    #start <- parse_start_time(data, L, start)
 
-    parsed <- list(L, H, start)
+    parsed <- list(L, start, variables)
 
     return(parsed)
 }
 
-slice_simple <- function(data, index_by, target, regressors, L, H, start, step) {
+slice_simple <- function(data, index_by, variables, L, start, step, names) {
 
     parsed <- match.call()
     parsed[[1]] <- parse_simple_slice_args
     parsed <- eval(parsed)
 
     L <- parsed[[1]]
-    H <- parsed[[2]]
-    start <- parsed[[3]]
+    #start <- parsed[[2]]
+    variables <- parsed[[3]]
 
     roll_indexes <- seq(start, nrow(data) - max(H), by = step)
 
