@@ -201,11 +201,15 @@ combine_features <- function(slice, feature1, feature2, return.all = FALSE) {
 #' @export
 
 as.data.table.slice_artifact <- function(x, melt_by, ...) {
-    features <- lapply(x, unlist)
-    features <- lapply(features, matrix, nrow = dim(x)[2], byrow = TRUE)
+    features <- lapply(x, function(l) do.call(rbind, l))
     features <- lapply(names(features), function(s) {
         m <- features[[s]]
-        colnames(m) <- paste0(s, "_", seq_len(ncol(m)))
+        if (is.null(colnames(m))) {
+            suffix <- seq_len(ncol(m))
+        } else {
+            suffix <- colnames(m)
+        }
+        colnames(m) <- paste0(s, "_", suffix)
         m
     })
     features <- Reduce(cbind, features)
