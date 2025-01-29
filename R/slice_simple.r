@@ -16,7 +16,7 @@ slice_simple <- function(data, index_by, variables, L, start, step, names) {
 
     parsed <- match.call()
     parsed[[1]] <- parse_simple_slice_args
-    parsed <- eval(parsed)
+    parsed <- eval(parsed, parent.frame(), parent.frame())
 
     L <- parsed[[1]]
     variables <- parsed[[2]]

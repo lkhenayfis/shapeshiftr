@@ -45,7 +45,7 @@ slice <- function(data, index_by, key_by, variables,
         mc[[1]] <- slice_keyed
     }
 
-    eval(mc)
+    eval(mc, parent.frame(), parent.frame())
 }
 
 auto_name <- function(x) {
