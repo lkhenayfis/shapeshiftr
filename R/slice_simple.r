@@ -1,18 +1,18 @@
 
-parse_simple_slice_args <- function(data, index_by, variables, L, start, step, names) {
+parse_simple_slice_args <- function(data, walk_on, variables, L, start, step, names) {
 
-    check_index_column(data, index_by)
-    variables <- parse_variables(data, index_by, NULL, variables)
-    sf    <- guess_sample_freq(data, index_by)
+    check_index_column(data, walk_on)
+    variables <- parse_variables(data, walk_on, NULL, variables)
+    sf    <- guess_sample_freq(data, walk_on)
     L     <- parse_laglead_times(L, variables, sf)
-    slice_times <- parse_slice_times(data, index_by, start, step, sf)
+    slice_times <- parse_slice_times(data, walk_on, start, step, sf)
 
     parsed <- list(L, variables, slice_times)
 
     return(parsed)
 }
 
-slice_simple <- function(data, index_by, variables, L, start, step, names) {
+slice_simple <- function(data, walk_on, variables, L, start, step, names) {
 
     parsed <- match.call()
     parsed[[1]] <- parse_simple_slice_args
@@ -23,7 +23,7 @@ slice_simple <- function(data, index_by, variables, L, start, step, names) {
     slice_times <- parsed[[3]]
 
     out <- lapply(slice_times, function(i) {
-        do_single_slice(data, i, index_by, variables, L, names)
+        do_single_slice(data, i, walk_on, variables, L, names)
     })
     out <- do.call(c, out)
 

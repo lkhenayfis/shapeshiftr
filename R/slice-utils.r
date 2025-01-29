@@ -1,18 +1,18 @@
 
 # SLICING UTILS ------------------------------------------------------------------------------------
 
-do_single_slice <- function(data, current_index, delta_on, variables, L, names) {
-    lst <- extract_lagleads(data, current_index, delta_on, variables, L)
+do_single_slice <- function(data, current_index, slice_on, variables, L, names) {
+    lst <- extract_lagleads(data, current_index, slice_on, variables, L)
     names(lst) <- names
 
     new_slice_artifact(lst, current_index, L)
 }
 
-extract_lagleads <- function(data, current_index, delta_on, variables, L) {
+extract_lagleads <- function(data, current_index, slice_on, variables, L) {
 
     time_indexes <- lapply(L, function(l) current_index + l)
     extracted <- mapply(variables, time_indexes, FUN = function(v, t) {
-        rows <- match(t, data[[delta_on]])
+        rows <- match(t, data[[slice_on]])
         list(data[rows][[v]])
     }, SIMPLIFY = FALSE)
 
@@ -21,18 +21,18 @@ extract_lagleads <- function(data, current_index, delta_on, variables, L) {
 
 # PARSE UTILS --------------------------------------------------------------------------------------
 
-check_index_column <- function(data, index_by) {
-    if (!(index_by %in% colnames(data))) stop("Column 'index_by' not found in 'data'")
+check_index_column <- function(data, walk_on) {
+    if (!(walk_on %in% colnames(data))) stop("Column 'walk_on' not found in 'data'")
 }
 
-parse_variables <- function(data, index_by, key_by, variables) {
+parse_variables <- function(data, walk_on, key_by, variables) {
     if (!missing("variables")) {
         if (!(all(variables %in% colnames(data)))) {
             stop("Some columns in 'variables' not found in 'data'")
         }
     } else {
         variables <- colnames(data)
-        variables <- variables[!(variables %in% c(index_by, key_by))]
+        variables <- variables[!(variables %in% c(walk_on, key_by))]
     }
 
     return(variables)
@@ -54,18 +54,18 @@ parse_laglead_times <- function(L, variables, sample_freq) {
     return(L)
 }
 
-parse_start_time <- function(data, index_by, start, sample_freq) UseMethod("parse_start_time", start)
+parse_start_time <- function(data, walk_on, start, sample_freq) UseMethod("parse_start_time", start)
 
-parse_start_time.default <- function(data, index_by, start, sample_freq) return(start)
+parse_start_time.default <- function(data, walk_on, start, sample_freq) return(start)
 
-parse_start_time.numeric <- function(data, index_by, start, sample_freq) {
-    start <- data[[index_by]][1] + sample_freq * (start - 1)
+parse_start_time.numeric <- function(data, walk_on, start, sample_freq) {
+    start <- data[[walk_on]][1] + sample_freq * (start - 1)
     return(start)
 }
 
-parse_step_time <- function(data, index_by, step, sample_freq) UseMethod("parse_step_time", step)
+parse_step_time <- function(data, walk_on, step, sample_freq) UseMethod("parse_step_time", step)
 
-parse_step_time.character <- function(data, index_by, step, sample_freq) {
+parse_step_time.character <- function(data, walk_on, step, sample_freq) {
     step  <- strsplit(step, " ")[[1]]
     units <- c("secs", "mins", "hours", "days", "weeks")
     resol <- units[grep(step[2], units)]
@@ -75,24 +75,24 @@ parse_step_time.character <- function(data, index_by, step, sample_freq) {
     return(step)
 }
 
-parse_step_time.numeric <- function(data, index_by, step, sample_freq) {
+parse_step_time.numeric <- function(data, walk_on, step, sample_freq) {
     step <- sample_freq * step
     return(step)
 }
 
-parse_slice_times <- function(data, index_by, start, step, sample_freq) {
-    step  <- parse_step_time(data, index_by, step, sample_freq)
-    start <- parse_start_time(data, index_by, start, sample_freq)
+parse_slice_times <- function(data, walk_on, start, step, sample_freq) {
+    step  <- parse_step_time(data, walk_on, step, sample_freq)
+    start <- parse_start_time(data, walk_on, start, sample_freq)
 
-    out <- seq(start, tail(data[[index_by]], 1), by = step)
+    out <- seq(start, tail(data[[walk_on]], 1), by = step)
 
     return(out)
 }
 
-guess_sample_freq <- function(data, delta_on) {
-    freq <- diff(head(data[[delta_on]], 2))
+guess_sample_freq <- function(data, slice_on) {
+    freq <- diff(head(data[[slice_on]], 2))
 
-    time_type <- class(data[1][[delta_on]])[1]
+    time_type <- class(data[1][[slice_on]])[1]
     unit <- switch(time_type,
         "Date" = "days",
         "POSIXlt" = "secs",

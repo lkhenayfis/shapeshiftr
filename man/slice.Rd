@@ -6,7 +6,7 @@
 \usage{
 slice(
   data,
-  index_by,
+  walk_on,
   key_by,
   variables,
   L = -1,
@@ -18,33 +18,53 @@ slice(
 \arguments{
 \item{data}{the data.frame-like object on which to operate}
 
-\item{index_by}{name of the column to use as index; this must be strictly increasing and
-\code{data} will be ordered on this column}
-
-\item{key_by}{similar to \code{index_by}, but serves as a secondary index. This is useful for
-forecast data, in which there is a from and to time-stamp; same restrictions apply}
+\item{walk_on}{name of the column to use as index for centering each slice. See Details}
 
 \item{variables}{names of variables for extraction in slicing}
 
 \item{L}{lag/lead times of the variables that must be extracted. See Details}
 
-\item{start}{integer indicating at which line slicing will start}
+\item{start}{where the slicing will start. Can be an integer, in which case it is interpreted as
+a line number, or a date-like object, in which case it is interpreted literally}
 
-\item{step}{integer indicating step size to walk through \code{index_by}}
+\item{step}{step size to walk through \code{walk_on}. Can be an integer, in which case it is
+interpreted as number of intervals in the temporal resolution of \code{walk_on}, or a string
+of the form "2 hours". See \link{\code{difftime}} for which time units are available}
 
 \item{names}{naming for each sliced variable; by default this is the same as \code{variables} or,
 if there are duplicates, appends \code{_X} where X is an increasing integer}
+
+\item{slice_on}{name of the column to use as reference for lead/lag slice search. See Details}
 }
 \value{
-An \code{\link{slice_artifact}} object with the results, see it's documentation for more
+An \link{\code{slice_artifact}} object with the results, see it's documentation for more
 details
 }
 \description{
 Operates on a time-indexed data.frame-like to generate appropriate regressors and target variable
 }
 \details{
+\code{walk_on} should be a time type column on which the reference times for slicing are searched
+for. There is also \code{slice_by}, which indicates on which column the lags/lead times are
+searched for. This may be confusing at first, but is intended to allow for simpler use of slicing
+when \code{data} is keyed, for example in the case of forecasting data in which there is a column
+of when the forecast was executed and which is the target time of the forecast.
+
+For example, the included data.table \code{keyed_dt_date}\tabular{llllll}{
+   date \tab target_date \tab X1 \tab X2 \tab X3 \tab Y \cr
+   2025-01-02 \tab 2025-01-03 \tab 16 \tab -18 \tab 66 \tab 132 \cr
+   2025-01-02 \tab 2025-01-04 \tab 5 \tab -17 \tab 55 \tab 122 \cr
+   2025-01-02 \tab 2025-01-05 \tab 12 \tab -16 \tab 68 \tab 138 \cr
+   2025-01-02 \tab 2025-01-06 \tab 15 \tab -19 \tab 69 \tab 137 \cr
+   2025-01-02 \tab 2025-01-07 \tab 9 \tab -7 \tab 70 \tab 125 \cr
+}
+
+
+If \code{walk_on = "date"} and \code{slice_on = "target_date"}, slices will be generated for
+values in \code{"date"}, but the actual subset will be based on \code{target_date}.
+
 Argument \code{variables} defines which columns in \code{data} are to be sliced. If it is empty,
-all variables except \code{index_by} and \code{key_by} are used. This argument also accepts
+all variables except \code{walk_on} and \code{key_by} are used. This argument also accepts
 duplicated values. This is intended to facilitate different forms of slicing a single variable
 in the data. One example would be if one is extracting both target future values and explanatory
 past values for fitting an autoregressive model.
@@ -57,5 +77,5 @@ If \code{L} is a single integer or vector of integers, it is assumed all variabl
 sliced equally.
 }
 \seealso{
-\code{\link{slice_artifact}} for in-depth details of the returned object
+\link{\code{slice_artifact}} for in-depth details of the returned object
 }
