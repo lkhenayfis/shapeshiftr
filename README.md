@@ -37,6 +37,7 @@ Suppose there are two datasets:
 <!-- end list -->
 
 ``` r
+obs  <- simple_dt_date[, .(date, X1, X2, Y)]
 print(obs)
 #>           date X1  X2   Y
 #>  1: 2025-01-02 16 -18 132
@@ -67,6 +68,7 @@ print(obs)
 <!-- end list -->
 
 ``` r
+pred <- keyed_dt_date[, .(date, target_date, X1, X2)]
 print(head(pred, 15))
 #>           date target_date X1  X2
 #>  1: 2025-01-02  2025-01-02 15 -14

@@ -16,8 +16,6 @@ knitr::opts_chunk$set(
 ```{r, include=FALSE}
 library(shapeshiftr)
 library(data.table)
-obs  <- simple_dt_date[, .(date, X1, X2, Y)]
-pred <- keyed_dt_date[, .(date, target_date, X1, X2)]
 ```
 
 # shapeshiftr
@@ -50,12 +48,14 @@ Suppose there are two datasets:
 * `obs`, containing observed data of explanatory variables "X1", "X2" and target variable "Y"
 
 ```{r}
+obs  <- simple_dt_date[, .(date, X1, X2, Y)]
 print(obs)
 ```
 
 * `pred`, containing predicted variables of the regressors "X1" and "X2" (i.e. numerical weather forecasts)
 
 ```{r}
+pred <- keyed_dt_date[, .(date, target_date, X1, X2)]
 print(head(pred, 15))
 ```
 
