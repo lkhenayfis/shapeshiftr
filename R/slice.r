@@ -56,14 +56,11 @@
 slice <- function(data, walk_on, slice_on, variables,
     L = -1, start = 2, step = 1, names = auto_name(variables)) {
 
-    mc <- match.call()
     if (missing("slice_on")) {
-        mc[[1]] <- slice_simple
+        slice_simple(data, walk_on, variables, L, start, step, names)
     } else {
-        mc[[1]] <- slice_keyed
+        slice_keyed(data, walk_on, slice_on, variables, L, start, step, names)
     }
-
-    eval(mc, parent.frame(), parent.frame())
 }
 
 auto_name <- function(x) {
