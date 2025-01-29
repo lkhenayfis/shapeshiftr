@@ -13,6 +13,21 @@ new_slice_artifact <- function(list, index, L) {
 
 # METHODS ------------------------------------------------------------------------------------------
 
+#' Get Dimensions Of \code{slice_artifact} Objects
+#' 
+#' Returns a vector with number of features and time indexes, in this order
+#' 
+#' @export
+
+dim.slice_artifact <- function(x) {
+    ni <- length(x)
+    nj <- length(attr(x, "index"))
+
+    out <- c(ni, nj)
+
+    return(out)
+}
+
 #' Concatenates \code{slice_artifact} Objects
 #' 
 #' Internal function; concatenates multiple objectes of this class into one \code{slice_artifact}
@@ -187,7 +202,7 @@ combine_features <- function(slice, feature1, feature2, return.all = FALSE) {
 
 as.data.table.slice_artifact <- function(x, melt_by, ...) {
     features <- lapply(x, unlist)
-    features <- lapply(features, matrix, ncol = length(x))
+    features <- lapply(features, matrix, nrow = dim(x)[2], byrow = TRUE)
     features <- lapply(names(features), function(s) {
         m <- features[[s]]
         colnames(m) <- paste0(s, "_", seq_len(ncol(m)))
