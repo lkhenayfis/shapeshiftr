@@ -90,7 +90,7 @@ parse_slice_times <- function(data, walk_on, start, step, sample_freq) {
 }
 
 guess_sample_freq <- function(data, slice_on) {
-    freq <- diff(head(data[[slice_on]], 2))
+    freq <- max(diff(data[[slice_on]]))
 
     time_type <- class(data[1][[slice_on]])[1]
     unit <- switch(time_type,
