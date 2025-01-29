@@ -3,13 +3,10 @@
 #' 
 #' Builds an object of class \code{slice_artifact}
 
-new_slice_artifact <- function(list, index, L, H) {
+new_slice_artifact <- function(list, index, L) {
     class(list) <- c("slice_artifact", "list")
     attr(list, "index") <- index
     attr(list, "L") <- L
-    attr(list, "H") <- H
-    attr(list, "lag_slices") <- grep("^lagged_", names(list))
-    attr(list, "lead_slices") <- grep("^lead_", names(list))
 
     return(list)
 }
@@ -39,8 +36,8 @@ c.slice_artifact <- function(...) {
 }
 
 match_slice_attr <- function(s1, s2) {
-    attr1 <- attributes(s1)[c("L", "H", "lag_slices", "lead_slices")]
-    attr2 <- attributes(s2)[c("L", "H", "lag_slices", "lead_slices")]
+    attr1 <- attributes(s1)[c("L")]
+    attr2 <- attributes(s2)[c("L")]
 
     same_attrs <- identical(attr1, attr2)
     same_names <- identical(names(s1), names(s2))
@@ -56,5 +53,5 @@ c_two_slices <- function(s1, s2) {
     list <- mapply("c", s1, s2, SIMPLIFY = FALSE)
     indexes <- c(attr(s1, "index"), attr(s2, "index"))
 
-    new_slice_artifact(list, indexes, attr(s1, "L"), attr(s1, "H"))
+    new_slice_artifact(list, indexes, attr(s1, "L"))
 }
