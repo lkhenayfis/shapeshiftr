@@ -8,7 +8,7 @@
 #' fitting/using models.
 #' 
 #' @docType package
-#' @name shapeshiftR
+#' @name shapeshiftr
 #' 
 #' @import stats utils data.table
 NULL
