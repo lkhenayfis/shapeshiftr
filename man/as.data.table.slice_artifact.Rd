@@ -4,7 +4,12 @@
 \alias{as.data.table.slice_artifact}
 \title{Converts \code{slice_artifact} To A \code{data.table}}
 \usage{
-\method{as.data.table}{slice_artifact}(x, ...)
+\method{as.data.table}{slice_artifact}(x, melt_by, ...)
+}
+\arguments{
+\item{x}{a \code{slice_artifact} object}
+
+\item{melt_by}{name pattern of target columns. Optional, if provided will melt result on them}
 }
 \description{
 Transforms an object of class \code{slice_artifact} to a \code{data.table}

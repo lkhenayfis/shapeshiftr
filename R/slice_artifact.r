@@ -180,9 +180,12 @@ combine_features <- function(slice, feature1, feature2, return.all = FALSE) {
 #' 
 #' Transforms an object of class \code{slice_artifact} to a \code{data.table}
 #' 
+#' @param x a \code{slice_artifact} object
+#' @param melt_by name pattern of target columns. Optional, if provided will melt result on them
+#' 
 #' @export
 
-as.data.table.slice_artifact <- function(x, ...) {
+as.data.table.slice_artifact <- function(x, melt_by, ...) {
     features <- lapply(x, unlist)
     features <- lapply(features, matrix, ncol = length(x))
     features <- lapply(names(features), function(s) {
@@ -196,6 +199,10 @@ as.data.table.slice_artifact <- function(x, ...) {
 
     dt <- data.table(index = index)
     dt <- cbind(dt, as.data.table(features))
+
+    if (!missing("melt_by")) {
+        dt <- melt(dt, index = "index", measure = patterns(melt_by))
+    }
 
     return(dt)
 }
