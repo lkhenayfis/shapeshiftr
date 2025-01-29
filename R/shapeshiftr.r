@@ -10,5 +10,5 @@
 #' @docType package
 #' @name shapeshiftR
 #' 
-#' @import stats utils data.table magrittr zoo
+#' @import stats utils data.table
 NULL

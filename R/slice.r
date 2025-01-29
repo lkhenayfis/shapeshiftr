@@ -52,6 +52,8 @@
 #' 
 #' @return An \link{\code{slice_artifact}} object with the results, see it's documentation for more
 #'     details
+#' 
+#' @export
 
 slice <- function(data, walk_on, slice_on, variables,
     L = -1, start = 2, step = 1, names = auto_name(variables)) {

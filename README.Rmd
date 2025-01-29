@@ -1,0 +1,77 @@
+---
+output: github_document
+---
+
+<!-- README.md is generated from README.Rmd. Please edit that file -->
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+    collapse = TRUE,
+    comment = "#>",
+    fig.path = "man/figures/README-",
+    out.width = "100%"
+)
+```
+
+```{r, include=FALSE}
+library(shapeshiftr)
+library(data.table)
+obs  <- simple_dt_date[, .(date, X1, X2, Y)]
+pred <- keyed_dt_date[, .(date, target_date, X1, X2)]
+```
+
+# shapeshiftr
+
+<!-- badges: start -->
+<!-- badges: end -->
+
+Package `shapeshiftr` aims at providing a simple and efficient interface for manipulation and 
+transformation of data for training forecasting models. This is effectively done through "slicing"
+operations, which transform standard tabular time series data into data.frames usable for model
+fitting/forecasting, as well as diverse transforms (such as wavelets).
+
+## Installation
+
+You can install the development version of shapeshiftr from
+[GitHub](https://github.com/lkhenayfis/shapeshiftr) with:
+
+``` r
+# install.packages("devtools")
+devtools::install_github("lkhenayfis/shapeshiftr")
+```
+
+## Example
+
+This is a basic example that demonstrates how `shapeshiftr` is meant to aid in data manipulation in
+it's canonical use case.
+
+Suppose there are two datasets:
+
+* `obs`, containing observed data of explanatory variables "X1", "X2" and target variable "Y"
+
+```{r}
+print(obs)
+```
+
+* `pred`, containing predicted variables of the regressors "X1" and "X2" (i.e. numerical weather forecasts)
+
+```{r}
+print(head(pred, 15))
+```
+
+The goal is to forecast "Y" two days ahead using 3 lags of "X1" and "X2", plus their forecasted
+values two days ahead. To build this dataset, we use
+
+```{r}
+lag_X <- slice(obs, "date", variables = c("X1", "X2"), L = -3:-1,
+    names = c("lag_X1", "lag_X2"))
+lead_X <- slice(pred, "date", "target_date", variables = c("X1", "X2"), L = 0:2,
+    names = c("lead_X1", "lead_X2"))
+target <- slice(obs, "date", variables = "Y", L = 2)
+
+X <- merge(lag_X, lead_X)
+training_data <- merge(X, target)
+
+dt <- as.data.table(training_data)
+print(head(dt, 10))
+```
