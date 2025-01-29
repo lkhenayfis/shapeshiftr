@@ -2,9 +2,10 @@
 # SLICING UTILS ------------------------------------------------------------------------------------
 
 do_single_slice <- function(data, current_index, delta_on, variables, L, names) {
-    out <- extract_lagleads(data, current_index, delta_on, variables, L)
-    names(out) <- names
-    return(out)
+    lst <- extract_lagleads(data, current_index, delta_on, variables, L)
+    names(lst) <- names
+
+    new_slice_artifact(lst, current_index, L)
 }
 
 extract_lagleads <- function(data, current_index, delta_on, variables, L) {

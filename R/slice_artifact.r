@@ -29,7 +29,7 @@ new_slice_artifact <- function(list, index, L) {
 c.slice_artifact <- function(...) {
     n <- ...length()
     if (n > 2) {
-        c_two_slices(..1, do.call(c_two_slices, list(...)[-1]))
+        c(..1, do.call(c, list(...)[-1]))
     } else {
         c_two_slices(..1, ..2)
     }

@@ -25,7 +25,7 @@ slice_simple <- function(data, index_by, variables, L, start, step, names) {
     out <- lapply(slice_times, function(i) {
         do_single_slice(data, i, index_by, variables, L, names)
     })
+    out <- do.call(c, out)
 
-    # TODO: concat all slices from `out`, rename duplicates if needed
     return(out)
 }
