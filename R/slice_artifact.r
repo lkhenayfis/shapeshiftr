@@ -171,3 +171,25 @@ combine_features <- function(slice, feature1, feature2, return.all = FALSE) {
         new_slice_artifact(comb_list, attr(slice, "index"), NA)
     }
 }
+
+#' Converts \code{slice_artifact} To A \code{data.table}
+#' 
+#' Transforms an object of class \code{slice_artifact} to a \code{data.table}
+
+as.data.table.slice_artifact <- function(x, ...) {
+    features <- lapply(x, unlist)
+    features <- lapply(features, matrix, ncol = length(x))
+    features <- lapply(names(features), function(s) {
+        m <- features[[s]]
+        colnames(m) <- paste0(s, "_", seq_len(ncol(m)))
+        m
+    })
+    features <- Reduce(cbind, features)
+
+    index <- attr(x, "index")
+
+    dt <- data.table(index = index)
+    dt <- cbind(dt, as.data.table(features))
+
+    return(dt)
+}
