@@ -52,19 +52,39 @@ parse_laglead_times <- function(L, variables, sample_freq) {
     return(L)
 }
 
-parse_start_time <- function(data, L, start) {
+parse_start_time <- function(data, index_by, start, sample_freq) UseMethod("parse_start_time", start)
 
-    max_lag  <- abs(min(unlist(L)))
-    max_lead <- abs(max(unlist(L)))
-    if (start < (max_lag + 1)) {
-        start <- max_lag + 1
-        warning("'start' is less than the maximum lags -- forcing to maximum lag + 1")
-    } else if (start > (nrow(data) - max_lead)) {
-        start <- nrow(data) - max_lead
-        warning("'start' is greater than the (nrow(data) - max lead) -- forcing to nrow(data) - max lead")
-    }
+parse_start_time.default <- function(data, index_by, start, sample_freq) return(start)
 
+parse_start_time.numeric <- function(data, index_by, start, sample_freq) {
+    start <- data[[index_by]][1] + sample_freq * (start - 1)
     return(start)
+}
+
+parse_step_time <- function(data, index_by, step, sample_freq) UseMethod("parse_step_time", step)
+
+parse_step_time.character <- function(data, index_by, step, sample_freq) {
+    step  <- strsplit(step, " ")[[1]]
+    units <- c("secs", "mins", "hours", "days", "weeks")
+    resol <- units[grep(step[2], units)]
+    tdiff <- as.difftime(as.numeric(step[1]), units = resol)
+    step <- as.numeric(tdiff, units = attr(sample_freq, "unit"))
+
+    return(step)
+}
+
+parse_step_time.numeric <- function(data, index_by, step, sample_freq) {
+    step <- sample_freq * step
+    return(step)
+}
+
+parse_slice_times <- function(data, index_by, start, step, sample_freq) {
+    step  <- parse_step_time(data, index_by, step, sample_freq)
+    start <- parse_start_time(data, index_by, start, sample_freq)
+
+    out <- seq(start, tail(data[[index_by]], 1), by = step)
+
+    return(out)
 }
 
 guess_sample_freq <- function(data, delta_on) {
@@ -77,6 +97,7 @@ guess_sample_freq <- function(data, delta_on) {
         "POSIXct" = "secs")
 
     freq <- as.numeric(freq, units = unit)
+    attr(freq, "unit") <- unit
 
     return(freq)
 }
