@@ -53,11 +53,11 @@
 #' @return An \link{\code{slice_artifact}} object with the results, see it's documentation for more
 #'     details
 
-slice <- function(data, walk_on, key_by, variables,
+slice <- function(data, walk_on, slice_on, variables,
     L = -1, start = 2, step = 1, names = auto_name(variables)) {
 
     mc <- match.call()
-    if (missing("key_by")) {
+    if (missing("slice_on")) {
         mc[[1]] <- slice_simple
     } else {
         mc[[1]] <- slice_keyed

@@ -7,7 +7,7 @@
 slice(
   data,
   walk_on,
-  key_by,
+  slice_on,
   variables,
   L = -1,
   start = 2,
@@ -19,6 +19,8 @@ slice(
 \item{data}{the data.frame-like object on which to operate}
 
 \item{walk_on}{name of the column to use as index for centering each slice. See Details}
+
+\item{slice_on}{name of the column to use as reference for lead/lag slice search. See Details}
 
 \item{variables}{names of variables for extraction in slicing}
 
@@ -33,8 +35,6 @@ of the form "2 hours". See \link{\code{difftime}} for which time units are avail
 
 \item{names}{naming for each sliced variable; by default this is the same as \code{variables} or,
 if there are duplicates, appends \code{_X} where X is an increasing integer}
-
-\item{slice_on}{name of the column to use as reference for lead/lag slice search. See Details}
 }
 \value{
 An \link{\code{slice_artifact}} object with the results, see it's documentation for more
