@@ -55,3 +55,78 @@ c_two_slices <- function(s1, s2) {
 
     new_slice_artifact(list, indexes, attr(s1, "L"))
 }
+
+#' Subsetting Of \code{slice_artifact}
+#' 
+#' Internal function; subsets \code{slice_artifact} either by variable or index
+#' 
+#' This function is not intended to be directly called by the user. It is only deployed in specific
+#' conditions within the package and does not have all the necessary sanity checks for external use.
+#' 
+#' @param x object of class \code{slice_artifact}
+#' @param i variables for subsetting; if missing returns all variables
+#' @param j indexes for subsetting; if missing returns all indexes
+#' 
+#' @export
+
+`[.slice_artifact` <- function(x, i, j, ...) {
+    if (missing("i")) i <- names(x)
+    if (missing("j")) j <- attr(x, "index")
+
+    L <- attr(x, "L")
+
+    x <- unclass(x)
+    list_i <- x[i]
+
+    indexes_keep <- attr(x, "index") %in% j
+    list_i_j <- lapply(list_i, function(l) l[indexes_keep])
+
+    new_slice_artifact(list_i_j, j, L)
+}
+
+#' Merges \code{slice_artifact} Objects
+#' 
+#' Internal function; merges objectes by common index into a single \code{slice_artifact}
+#' 
+#' This function is not intended to be directly called by the user. It is only deployed in specific
+#' conditions within the package and does not have all the necessary sanity checks for external use.
+#' 
+#' Contrary to \code{c.slice_artifact}, this function is meant to combine artifacts from different
+#' data, or different slicing parameters, into a unified artifact object. This will match indexes
+#' in all elements for merging and ONLY USE indexes which are common to all. There is no \code{all}
+#' argument like in data.frame merging.
+#' 
+#' @export
+
+merge.slice_artifact <- function(x, y, ...) {
+    matched_indexes <- matched_slice_indexes(x, y)
+    x <- x[, matched_indexes]
+    y <- y[, matched_indexes]
+
+    inner_merge_slices(x, y)
+}
+
+matched_slice_indexes <- function(s1, s2) {
+    index_s1 <- attr(s1, "index")
+    index_s2 <- attr(s2, "index")
+
+    match_s1_s2 <- match(index_s1, index_s2)
+    matched_indexes <- index_s1[!is.na(match_s1_s2)]
+
+    return(matched_indexes)
+}
+
+inner_merge_slices <- function(s1, s2) {
+
+    attr_s1 <- attributes(s1)
+    attributes(s1) <- NULL
+    names(s1)      <- attr_s1$names
+
+    attr_s2 <- attributes(s2)
+    attributes(s2) <- NULL
+    names(s2)      <- attr_s2$names
+
+    list <- c(s1, s2)
+
+    new_slice_artifact(list, attr_s1$index, NA)
+}
