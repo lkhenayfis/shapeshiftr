@@ -134,6 +134,8 @@ inner_merge_slices <- function(s1, s2) {
 #' Remove \code{NA} From Slices
 #' 
 #' Removes all indexes where there is at least one feature with \code{NA}s
+#' 
+#' @export
 
 na.exclude.slice_artifact <- function(object, ...) {
     indexes <- attr(object, "index")
@@ -153,6 +155,8 @@ na.exclude.slice_artifact <- function(object, ...) {
 #' @param feature1,feature2 the features which will be combined into one
 #' @param return.all boolean indicating if the returned object should contain all remaining features
 #'     along the merged one
+#' 
+#' @export
 
 combine_features <- function(slice, feature1, feature2, return.all = FALSE) {
 
@@ -175,6 +179,8 @@ combine_features <- function(slice, feature1, feature2, return.all = FALSE) {
 #' Converts \code{slice_artifact} To A \code{data.table}
 #' 
 #' Transforms an object of class \code{slice_artifact} to a \code{data.table}
+#' 
+#' @export
 
 as.data.table.slice_artifact <- function(x, ...) {
     features <- lapply(x, unlist)
