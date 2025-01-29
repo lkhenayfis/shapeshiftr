@@ -130,3 +130,44 @@ inner_merge_slices <- function(s1, s2) {
 
     new_slice_artifact(list, attr_s1$index, NA)
 }
+
+#' Remove \code{NA} From Slices
+#' 
+#' Removes all indexes where there is at least one feature with \code{NA}s
+
+na.exclude.slice_artifact <- function(object, ...) {
+    indexes <- attr(object, "index")
+    has_na  <- sapply(object, function(f) sapply(f, function(v) any(is.na(v))))
+    has_na  <- rowSums(has_na) > 0
+
+    indexes_keep <- indexes[!has_na]
+
+    object[, indexes_keep]
+}
+
+#' Combines Slice Two Features Into One
+#' 
+#' Concatenates two features of a slice into a single one
+#' 
+#' @param slice a \code{slice_artifact} object
+#' @param feature1,feature2 the features which will be combined into one
+#' @param return.all boolean indicating if the returned object should contain all remaining features
+#'     along the merged one
+
+combine_features <- function(slice, feature1, feature2, return.all = FALSE) {
+
+    all_features <- names(slice)
+
+    comb_list <- slice[c(feature1, feature2)]
+    comb_list <- list(mapply(c, slice[[feature1]], slice[[feature2]], SIMPLIFY = FALSE))
+    names(comb_list) <- paste0(feature1, "_c_", feature2)
+
+    if (return.all) {
+        all <- slice[!(names(slice) %in% c(feature1, feature2))]
+        all <- c(unclass(all), unclass(comb_list))
+
+        new_slice_artifact(all, attr(slice, "index"), NA)
+    } else {
+        new_slice_artifact(comb_list, attr(slice, "index"), NA)
+    }
+}
