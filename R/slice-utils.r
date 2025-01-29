@@ -12,7 +12,7 @@ extract_lagleads <- function(data, current_index, delta_on, variables, L) {
     time_indexes <- lapply(L, function(l) current_index + l)
     extracted <- mapply(variables, time_indexes, FUN = function(v, t) {
         rows <- match(t, data[[delta_on]])
-        data[rows][[v]]
+        list(data[rows][[v]])
     }, SIMPLIFY = FALSE)
 
     return(extracted)
