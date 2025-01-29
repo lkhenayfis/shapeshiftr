@@ -3,7 +3,7 @@
 \docType{package}
 \name{shapeshiftR}
 \alias{shapeshiftR}
-\title{PAckage \code{shapeshiftr}}
+\title{Package \code{shapeshiftr}}
 \description{
 Automated pipeline for shape manipulation and data transforms
 }

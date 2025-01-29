@@ -4,7 +4,7 @@
 \alias{new_slice_artifact}
 \title{Slice Artifact Inner Constructor}
 \usage{
-new_slice_artifact(list, index, L, H)
+new_slice_artifact(list, index, L)
 }
 \description{
 Builds an object of class \code{slice_artifact}

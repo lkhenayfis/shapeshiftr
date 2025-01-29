@@ -8,12 +8,11 @@ slice(
   data,
   index_by,
   key_by,
-  target,
-  regressors,
-  L = 1,
-  H = 1,
+  variables,
+  L = -1,
   start = 2,
-  step = 1
+  step = 1,
+  names = auto_name(variables)
 )
 }
 \arguments{
@@ -25,17 +24,16 @@ slice(
 \item{key_by}{similar to \code{index_by}, but serves as a secondary index. This is useful for
 forecast data, in which there is a from and to time-stamp; same restrictions apply}
 
-\item{target}{name of the target variable}
+\item{variables}{names of variables for extraction in slicing}
 
-\item{regressors}{optional, names of explanatory variables}
-
-\item{L}{lag times of the target and explanatory variables that must be extracted. See Details}
-
-\item{H}{lead times of the target variable that must be extracted. See Details}
+\item{L}{lag/lead times of the variables that must be extracted. See Details}
 
 \item{start}{integer indicating at which line slicing will start}
 
 \item{step}{integer indicating step size to walk through \code{index_by}}
+
+\item{names}{naming for each sliced variable; by default this is the same as \code{variables} or,
+if there are duplicates, appends \code{_X} where X is an increasing integer}
 }
 \value{
 An \code{\link{slice_artifact}} object with the results, see it's documentation for more
@@ -45,15 +43,18 @@ details
 Operates on a time-indexed data.frame-like to generate appropriate regressors and target variable
 }
 \details{
-Lag times, indicated by argument \code{L}, can be defined individually for each explanatory or
-target variable. In order to do so, this argument must be a list of vectors of integers.
-The first position is assumed corresponding to the target variable; the following ones are
-matched to \code{regressors} in the order this argument was provided. It is possible to pass
-\code{L} as a single integer, or vector of integers, in which case it will be assumed the same
-lags for every variable.
+Argument \code{variables} defines which columns in \code{data} are to be sliced. If it is empty,
+all variables except \code{index_by} and \code{key_by} are used. This argument also accepts
+duplicated values. This is intended to facilitate different forms of slicing a single variable
+in the data. One example would be if one is extracting both target future values and explanatory
+past values for fitting an autoregressive model.
 
-The behavior of lead times \code{H} is similar, since it is only applicable to the target
-variable, it is a vector of integers at most, not a list.
+Lag and lead times, passed through argument \code{L}, are differentiated by their sign. Negative
+values are interpreted as lags and positive ones as leads. The canonical way to pass this
+argument is as list indicating lags/leads for each variable, in the same order as
+\code{variables}. If unamed, it is assumed \code{L} is in the same order as \code{variables}.
+If \code{L} is a single integer or vector of integers, it is assumed all variables should be
+sliced equally.
 }
 \seealso{
 \code{\link{slice_artifact}} for in-depth details of the returned object
