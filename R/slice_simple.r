@@ -23,7 +23,7 @@ slice_simple <- function(data, index_by, variables, L, start, step, names) {
     slice_times <- parsed[[3]]
 
     out <- lapply(slice_times, function(i) {
-        do_single_slice(data, index_by, i, variables, L)
+        do_single_slice(data, i, index_by, variables, L, names)
     })
 
     # TODO: concat all slices from `out`, rename duplicates if needed
