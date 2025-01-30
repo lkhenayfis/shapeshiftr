@@ -31,13 +31,13 @@ a line number, or a date-like object, in which case it is interpreted literally}
 
 \item{step}{step size to walk through \code{walk_on}. Can be an integer, in which case it is
 interpreted as number of intervals in the temporal resolution of \code{walk_on}, or a string
-of the form "2 hours". See \link{\code{difftime}} for which time units are available}
+of the form "2 hours". See \code{\link{difftime}} for which time units are available}
 
 \item{names}{naming for each sliced variable; by default this is the same as \code{variables} or,
 if there are duplicates, appends \code{_X} where X is an increasing integer}
 }
 \value{
-An \link{\code{slice_artifact}} object with the results, see it's documentation for more
+An \code{\link{slice_artifact}} object with the results, see it's documentation for more
 details
 }
 \description{
@@ -77,5 +77,5 @@ If \code{L} is a single integer or vector of integers, it is assumed all variabl
 sliced equally.
 }
 \seealso{
-\link{\code{slice_artifact}} for in-depth details of the returned object
+\code{\link{slice_artifact}} for in-depth details of the returned object
 }
