@@ -1,2 +1,9 @@
+^informals$
+^profiling$
+^data-raw$
 ^LICENSE\.md$
 ^README\.Rmd$
+^\.github$
+^doc$
+^Meta$
+^\.vscode$
