@@ -6,6 +6,11 @@
 \usage{
 \method{merge}{slice_artifact}(x, y, ...)
 }
+\arguments{
+\item{x, y}{objects of class \code{slice_artifact} for merging}
+
+\item{...}{has no utility other than consistency with the generic}
+}
 \description{
 Internal function; merges objectes by common index into a single \code{slice_artifact}
 }

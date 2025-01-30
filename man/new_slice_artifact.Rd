@@ -6,6 +6,13 @@
 \usage{
 new_slice_artifact(list, index, L)
 }
+\arguments{
+\item{list}{a list of data.frame-like slices as extracted by \code{do_single_slice}}
+
+\item{index}{scalar of vector of time indexes corresponding to each slice}
+
+\item{L}{the list of lag/leads used in extracting slices}
+}
 \description{
 Builds an object of class \code{slice_artifact}
 }

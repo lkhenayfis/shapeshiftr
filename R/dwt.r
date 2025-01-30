@@ -9,6 +9,8 @@
 #' 
 #' @import wavelets
 #' 
+#' @rdname dwt
+#' 
 #' @export
 
 dwt.slice_artifact <- function(X, variables, ...) {
@@ -46,12 +48,16 @@ build_wavelets_single_variable <- function(l, ...) {
     return(wavs)
 }
 
+#' @rdname dwt
+#' 
 #' @export
 
 dwt.default <- function(X, ...) {
     wavelets::dwt(X, ...)
 }
 
+#' @rdname dwt
+#' 
 #' @export
 
 dwt <- function(X, ...) UseMethod("dwt")

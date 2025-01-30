@@ -6,6 +6,9 @@
 \usage{
 \method{dim}{slice_artifact}(x)
 }
+\arguments{
+\item{x}{a \code{slice_artifact} object}
+}
 \description{
 Returns a vector with number of features and time indexes, in this order
 }

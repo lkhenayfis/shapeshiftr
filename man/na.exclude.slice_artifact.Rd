@@ -6,6 +6,11 @@
 \usage{
 \method{na.exclude}{slice_artifact}(object, ...)
 }
+\arguments{
+\item{object}{object of class \code{slice_artifact}}
+
+\item{...}{has no utility other than consistency with the generic}
+}
 \description{
 Removes all indexes where there is at least one feature with \code{NA}s
 }

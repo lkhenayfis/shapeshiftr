@@ -12,6 +12,8 @@
 \item{i}{variables for subsetting; if missing returns all variables}
 
 \item{j}{indexes for subsetting; if missing returns all indexes}
+
+\item{...}{has no utility other than consistency with the generic}
 }
 \description{
 Internal function; subsets \code{slice_artifact} either by variable or index

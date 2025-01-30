@@ -37,8 +37,8 @@ of the form "2 hours". See \code{\link{difftime}} for which time units are avail
 if there are duplicates, appends \code{_X} where X is an increasing integer}
 }
 \value{
-An \code{\link{slice_artifact}} object with the results, see it's documentation for more
-details
+An \code{slice_artifact} object with the results, see \code{\link{new_slice_artifact}}
+for more details
 }
 \description{
 Operates on a time-indexed data.frame-like to generate appropriate regressors and target variable
@@ -77,5 +77,5 @@ If \code{L} is a single integer or vector of integers, it is assumed all variabl
 sliced equally.
 }
 \seealso{
-\code{\link{slice_artifact}} for in-depth details of the returned object
+\code{\link{new_slice_artifact}} for in-depth details of the returned object
 }

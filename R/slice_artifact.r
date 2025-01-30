@@ -2,6 +2,10 @@
 #' Slice Artifact Inner Constructor
 #' 
 #' Builds an object of class \code{slice_artifact}
+#' 
+#' @param list a list of data.frame-like slices as extracted by \code{do_single_slice}
+#' @param index scalar of vector of time indexes corresponding to each slice
+#' @param L the list of lag/leads used in extracting slices
 
 new_slice_artifact <- function(list, index, L) {
     class(list) <- c("slice_artifact", "list")
@@ -16,6 +20,8 @@ new_slice_artifact <- function(list, index, L) {
 #' Get Dimensions Of \code{slice_artifact} Objects
 #' 
 #' Returns a vector with number of features and time indexes, in this order
+#' 
+#' @param x a \code{slice_artifact} object
 #' 
 #' @export
 
@@ -38,6 +44,8 @@ dim.slice_artifact <- function(x) {
 #' Mainly \code{c.slice_artifact} is intended to combine individual artifacts returned by 
 #' \code{do_single_slice}, which are artifacts concerning a single time index, into the complete
 #' one for the whole original data
+#' 
+#' @param ... variable number of \code{slice_artifact} objects
 #' 
 #' @export
 
@@ -81,6 +89,7 @@ c_two_slices <- function(s1, s2) {
 #' @param x object of class \code{slice_artifact}
 #' @param i variables for subsetting; if missing returns all variables
 #' @param j indexes for subsetting; if missing returns all indexes
+#' @param ... has no utility other than consistency with the generic
 #' 
 #' @export
 
@@ -110,6 +119,9 @@ c_two_slices <- function(s1, s2) {
 #' data, or different slicing parameters, into a unified artifact object. This will match indexes
 #' in all elements for merging and ONLY USE indexes which are common to all. There is no \code{all}
 #' argument like in data.frame merging.
+#' 
+#' @param x,y objects of class \code{slice_artifact} for merging
+#' @param ... has no utility other than consistency with the generic
 #' 
 #' @export
 
@@ -149,6 +161,9 @@ inner_merge_slices <- function(s1, s2) {
 #' Remove \code{NA} From Slices
 #' 
 #' Removes all indexes where there is at least one feature with \code{NA}s
+#' 
+#' @param object object of class \code{slice_artifact}
+#' @param ... has no utility other than consistency with the generic
 #' 
 #' @export
 
@@ -197,10 +212,13 @@ combine_features <- function(slice, feature1, feature2, return.all = FALSE) {
 #' 
 #' @param x a \code{slice_artifact} object
 #' @param melt_by name pattern of target columns. Optional, if provided will melt result on them
+#' @param keep.rownames has no utility other than consistency with the generic
+#' @param ... has no utility other than consistency with the generic
 #' 
 #' @export
 
-as.data.table.slice_artifact <- function(x, melt_by, ...) {
+as.data.table.slice_artifact <- function(x, keep.rownames = FALSE, melt_by, ...) {
+
     features <- lapply(x, function(l) do.call(rbind, l))
     features <- lapply(names(features), function(s) {
         m <- features[[s]]
@@ -220,7 +238,7 @@ as.data.table.slice_artifact <- function(x, melt_by, ...) {
     dt <- cbind(dt, as.data.table(features))
 
     if (!missing("melt_by")) {
-        dt <- melt(dt, index = "index", measure = patterns(melt_by))
+        dt <- melt(dt, index = "index", measure = data.table:::patterns(melt_by))
     }
 
     return(dt)

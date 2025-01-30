@@ -2,9 +2,15 @@
 % Please edit documentation in R/dwt.r
 \name{dwt.slice_artifact}
 \alias{dwt.slice_artifact}
+\alias{dwt.default}
+\alias{dwt}
 \title{Discrete Wavelet Transform Method For \code{slice_artifact} Objects}
 \usage{
 \method{dwt}{slice_artifact}(X, variables, ...)
+
+\method{dwt}{default}(X, ...)
+
+dwt(X, ...)
 }
 \arguments{
 \item{X}{a \code{slice_artifact} object}

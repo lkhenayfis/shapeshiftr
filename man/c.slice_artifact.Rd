@@ -6,6 +6,9 @@
 \usage{
 \method{c}{slice_artifact}(...)
 }
+\arguments{
+\item{...}{variable number of \code{slice_artifact} objects}
+}
 \description{
 Internal function; concatenates multiple objectes of this class into one \code{slice_artifact}
 }

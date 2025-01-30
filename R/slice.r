@@ -48,10 +48,10 @@
 #' @param names naming for each sliced variable; by default this is the same as \code{variables} or,
 #'     if there are duplicates, appends \code{_X} where X is an increasing integer 
 #' 
-#' @seealso \code{\link{slice_artifact}} for in-depth details of the returned object
+#' @seealso \code{\link{new_slice_artifact}} for in-depth details of the returned object
 #' 
-#' @return An \code{\link{slice_artifact}} object with the results, see it's documentation for more
-#'     details
+#' @return An \code{slice_artifact} object with the results, see \code{\link{new_slice_artifact}}
+#'     for more details
 #' 
 #' @export
 
