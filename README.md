@@ -5,6 +5,8 @@
 
 <!-- badges: start -->
 
+[![R-CMD-check](https://github.com/lkhenayfis/shapeshiftr/actions/workflows/check-standard.yaml/badge.svg)](https://github.com/lkhenayfis/shapeshiftr/actions/workflows/check-standard.yaml)
+[![test-coverage](https://github.com/lkhenayfis/shapeshiftr/actions/workflows/test-coverage.yaml/badge.svg)](https://github.com/lkhenayfis/shapeshiftr/actions/workflows/test-coverage.yaml)
 <!-- badges: end -->
 
 Package `shapeshiftr` aims at providing a simple and efficient interface
@@ -38,28 +40,14 @@ Suppose there are two datasets:
 
 ``` r
 obs  <- simple_dt_date[, .(date, X1, X2, Y)]
-print(obs)
-#>           date X1  X2   Y
-#>  1: 2025-01-02 16 -18 132
-#>  2: 2025-01-03  5 -17 122
-#>  3: 2025-01-04 12 -16 138
-#>  4: 2025-01-05 15 -19 137
-#>  5: 2025-01-06  9  -7 125
-#>  6: 2025-01-07 19  -6 131
-#>  7: 2025-01-08  6 -13 123
-#>  8: 2025-01-09  4 -10 128
-#>  9: 2025-01-10  2  -2 126
-#> 10: 2025-01-11  7  -1 139
-#> 11: 2025-01-12 14 -14 136
-#> 12: 2025-01-13 10 -12 124
-#> 13: 2025-01-14 11  -8 127
-#> 14: 2025-01-15 20 -15 133
-#> 15: 2025-01-16 13  -9 134
-#> 16: 2025-01-17  8  -4 120
-#> 17: 2025-01-18 17  -5 140
-#> 18: 2025-01-19  1  -3 135
-#> 19: 2025-01-20 18 -20 129
-#> 20: 2025-01-21  3 -11 130
+print(head(obs))
+#>          date X1  X2   Y
+#> 1: 2025-01-02 16 -18 132
+#> 2: 2025-01-03  5 -17 122
+#> 3: 2025-01-04 12 -16 138
+#> 4: 2025-01-05 15 -19 137
+#> 5: 2025-01-06  9  -7 125
+#> 6: 2025-01-07 19  -6 131
 ```
 
   - `pred`, containing predicted variables of the regressors “X1” and
@@ -69,7 +57,7 @@ print(obs)
 
 ``` r
 pred <- keyed_dt_date[, .(date, target_date, X1, X2)]
-print(head(pred, 15))
+print(head(pred, 10))
 #>           date target_date X1  X2
 #>  1: 2025-01-02  2025-01-02 15 -14
 #>  2: 2025-01-02  2025-01-03 12 -12
@@ -81,11 +69,6 @@ print(head(pred, 15))
 #>  8: 2025-01-03  2025-01-05 19  -8
 #>  9: 2025-01-03  2025-01-06 13  -5
 #> 10: 2025-01-03  2025-01-07 18 -17
-#> 11: 2025-01-04  2025-01-04 16  -2
-#> 12: 2025-01-04  2025-01-05  7 -15
-#> 13: 2025-01-04  2025-01-06  2  -4
-#> 14: 2025-01-04  2025-01-07 17 -19
-#> 15: 2025-01-04  2025-01-08  6  -3
 ```
 
 The goal is to forecast “Y” two days ahead using 3 lags of “X1” and
@@ -103,6 +86,11 @@ X <- merge(lag_X, lead_X)
 training_data <- merge(X, target)
 
 dt <- as.data.table(training_data)
+```
+
+The resulting data.table is
+
+``` r
 print(head(dt, 10))
 #>          index lag_X1_1 lag_X1_2 lag_X1_3 lag_X2_1 lag_X2_2 lag_X2_3 lead_X1_1
 #>  1: 2025-01-03       NA       NA       16       NA       NA      -18        14

@@ -21,6 +21,8 @@ library(data.table)
 # shapeshiftr
 
 <!-- badges: start -->
+[![R-CMD-check](https://github.com/lkhenayfis/shapeshiftr/actions/workflows/check-standard.yaml/badge.svg)](https://github.com/lkhenayfis/shapeshiftr/actions/workflows/check-standard.yaml)
+[![test-coverage](https://github.com/lkhenayfis/shapeshiftr/actions/workflows/test-coverage.yaml/badge.svg)](https://github.com/lkhenayfis/shapeshiftr/actions/workflows/test-coverage.yaml)
 <!-- badges: end -->
 
 Package `shapeshiftr` aims at providing a simple and efficient interface for manipulation and 
@@ -49,14 +51,14 @@ Suppose there are two datasets:
 
 ```{r}
 obs  <- simple_dt_date[, .(date, X1, X2, Y)]
-print(obs)
+print(head(obs))
 ```
 
 * `pred`, containing predicted variables of the regressors "X1" and "X2" (i.e. numerical weather forecasts)
 
 ```{r}
 pred <- keyed_dt_date[, .(date, target_date, X1, X2)]
-print(head(pred, 15))
+print(head(pred, 10))
 ```
 
 The goal is to forecast "Y" two days ahead using 3 lags of "X1" and "X2", plus their forecasted
@@ -73,5 +75,10 @@ X <- merge(lag_X, lead_X)
 training_data <- merge(X, target)
 
 dt <- as.data.table(training_data)
+```
+
+The resulting data.table is
+
+```{r}
 print(head(dt, 10))
 ```
