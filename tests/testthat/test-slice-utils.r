@@ -1,4 +1,101 @@
 
+test_that("extract_lagleads", {
+
+    # Date - simple
+
+    center <- as.Date("2025-01-10")
+    L <- list(-7:-2, -2:1, 0:4)
+    ll <- extract_lagleads(
+        simple_dt_date,
+        center,
+        "date",
+        c("X1", "X3", "Y"),
+        L
+    )
+
+    X1_ref <- list(simple_dt_date[match(center + L[[1]], date), X1])
+    expect_equal(ll$X1, X1_ref)
+
+    X3_ref <- list(simple_dt_date[match(center + L[[2]], date), X3])
+    expect_equal(ll$X3, X3_ref)
+
+    Y_ref <- list(simple_dt_date[match(center + L[[3]], date), Y])
+    expect_equal(ll$Y, Y_ref)
+
+    # Date - keyed
+
+    center <- as.Date("2025-01-10")
+    L <- list(0:2, 1:4)
+    ll <- extract_lagleads(
+        keyed_dt_date[date == center],
+        center,
+        "target_date",
+        c("X1", "X2"),
+        L
+    )
+
+    dt <- keyed_dt_date[(date == center)]
+    X1_ref <- list(dt[match(center + L[[1]], target_date), X1])
+    expect_equal(ll$X1, X1_ref)
+
+    X2_ref <- list(dt[match(center + L[[2]], target_date), X2])
+    expect_equal(ll$X2, X2_ref)
+})
+
+test_that("do_single_slice", {
+
+    # Date - simple
+
+    center <- as.Date("2025-01-10")
+    L <- list(-7:-2, -2:1, 0:4)
+    sa <- do_single_slice(
+        simple_dt_date,
+        center,
+        "date",
+        c("X1", "X3", "Y"),
+        L,
+        c("X1", "X3", "Y")
+    )
+
+    expect_equal(class(sa), c("slice_artifact", "list"))
+    expect_equal(attr(sa, "index"), center)
+    expect_equal(attr(sa, "L"), L)
+
+    X1_ref <- list(simple_dt_date[match(center + L[[1]], date), X1])
+    expect_equal(sa$X1, X1_ref)
+
+    X3_ref <- list(simple_dt_date[match(center + L[[2]], date), X3])
+    expect_equal(sa$X3, X3_ref)
+
+    Y_ref <- list(simple_dt_date[match(center + L[[3]], date), Y])
+    expect_equal(sa$Y, Y_ref)
+
+    # Date - keyed
+
+    center <- as.Date("2025-01-10")
+    L <- list(0:2, 1:4)
+    sa <- do_single_slice(
+        keyed_dt_date[date == center],
+        center,
+        "target_date",
+        c("X1", "X2"),
+        L,
+        c("X1", "X2")
+    )
+
+    expect_equal(class(sa), c("slice_artifact", "list"))
+    expect_equal(attr(sa, "index"), center)
+    expect_equal(attr(sa, "L"), L)
+
+    dt <- keyed_dt_date[(date == center)]
+
+    X1_ref <- list(dt[match(center + L[[1]], target_date), X1])
+    expect_equal(sa$X1, X1_ref)
+
+    X2_ref <- list(dt[match(center + L[[2]], target_date), X2])
+    expect_equal(sa$X2, X2_ref)
+})
+
 test_that("check_index_column", {
 
     test_fun <- function(data, walk_on) {
