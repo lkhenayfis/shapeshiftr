@@ -38,7 +38,25 @@ parse_variables <- function(data, walk_on, key_by, variables) {
     return(variables)
 }
 
-parse_laglead_times <- function(L, variables, sample_freq) {
+guess_sample_freq <- function(data, column) {
+
+    freq <- max(diff(data[[column]]))
+
+    time_type <- class(data[1][[column]])[1]
+    unit <- switch(time_type,
+        "Date" = "days",
+        "POSIXlt" = "secs",
+        "POSIXct" = "secs")
+
+    freq <- as.numeric(freq, units = unit)
+    attr(freq, "unit") <- unit
+
+    return(freq)
+}
+
+parse_laglead_times <- function(data, slice_on, L, variables) {
+
+    sample_freq <- guess_sample_freq(data, slice_on)
 
     M <- length(variables)
     L_is_list <- is.list(L)
@@ -49,16 +67,16 @@ parse_laglead_times <- function(L, variables, sample_freq) {
         L <- lapply(seq_len(M), function(i) L)
     }
 
-    L <- lapply(L, function(l) l * sample_freq)
+    L <- lapply(L, function(l) l * as.numeric(sample_freq))
 
     return(L)
 }
 
-parse_start_time <- function(data, walk_on, start, sample_freq) UseMethod("parse_start_time", start)
+parse_start_time <- function(data, walk_on, start) UseMethod("parse_start_time", start)
 
-parse_start_time.default <- function(data, walk_on, start, sample_freq) return(start)
+parse_start_time.default <- function(data, walk_on, start) return(start)
 
-parse_start_time.character <- function(data, walk_on, start, sample_freq) {
+parse_start_time.character <- function(data, walk_on, start) {
     example <- data[[walk_on]][1]
     class_walk_on <- class(example)
     if (class_walk_on[1] == "Date") {
@@ -70,14 +88,16 @@ parse_start_time.character <- function(data, walk_on, start, sample_freq) {
     return(start)
 }
 
-parse_start_time.numeric <- function(data, walk_on, start, sample_freq) {
-    start <- data[[walk_on]][1] + sample_freq * (start - 1)
+parse_start_time.numeric <- function(data, walk_on, start) {
+    sample_freq <- guess_sample_freq(data, walk_on)
+    start <- data[[walk_on]][1] + as.numeric(sample_freq) * (start - 1)
     return(start)
 }
 
-parse_step_time <- function(data, walk_on, step, sample_freq) UseMethod("parse_step_time", step)
+parse_step_time <- function(data, walk_on, step) UseMethod("parse_step_time", step)
 
-parse_step_time.character <- function(data, walk_on, step, sample_freq) {
+parse_step_time.character <- function(data, walk_on, step) {
+    sample_freq <- guess_sample_freq(data, walk_on)
     step  <- strsplit(step, " ")[[1]]
     units <- c("secs", "mins", "hours", "days", "weeks")
     resol <- units[grep(step[2], units)]
@@ -87,31 +107,17 @@ parse_step_time.character <- function(data, walk_on, step, sample_freq) {
     return(step)
 }
 
-parse_step_time.numeric <- function(data, walk_on, step, sample_freq) {
-    step <- sample_freq * step
+parse_step_time.numeric <- function(data, walk_on, step) {
+    sample_freq <- guess_sample_freq(data, walk_on)
+    step <- as.numeric(sample_freq) * step
     return(step)
 }
 
-parse_slice_times <- function(data, walk_on, start, step, sample_freq) {
-    step  <- parse_step_time(data, walk_on, step, sample_freq)
-    start <- parse_start_time(data, walk_on, start, sample_freq)
+parse_slice_times <- function(data, walk_on, start, step) {
+    step  <- parse_step_time(data, walk_on, step)
+    start <- parse_start_time(data, walk_on, start)
 
     out <- seq(start, tail(data[[walk_on]], 1), by = step)
 
     return(out)
-}
-
-guess_sample_freq <- function(data, slice_on) {
-    freq <- max(diff(data[[slice_on]]))
-
-    time_type <- class(data[1][[slice_on]])[1]
-    unit <- switch(time_type,
-        "Date" = "days",
-        "POSIXlt" = "secs",
-        "POSIXct" = "secs")
-
-    freq <- as.numeric(freq, units = unit)
-    attr(freq, "unit") <- unit
-
-    return(freq)
 }

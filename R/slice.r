@@ -80,9 +80,8 @@ parse_simple_slice_args <- function(data, walk_on, variables, L, start, step, na
 
     check_index_column(data, walk_on)
     variables <- parse_variables(data, walk_on, NULL, variables)
-    sf    <- guess_sample_freq(data, walk_on)
-    L     <- parse_laglead_times(L, variables, sf)
-    slice_times <- parse_slice_times(data, walk_on, start, step, sf)
+    L     <- parse_laglead_times(data, walk_on, L, variables)
+    slice_times <- parse_slice_times(data, walk_on, start, step)
 
     parsed <- list(L, variables, slice_times)
 
@@ -114,10 +113,8 @@ parse_keyed_slice_args <- function(data, walk_on, slice_on, variables, L, start,
     check_index_column(data, walk_on)
     check_index_column(data, slice_on)
     variables <- parse_variables(data, walk_on, slice_on, variables)
-    sf_w  <- guess_sample_freq(data, walk_on)
-    sf_s  <- guess_sample_freq(data, slice_on)
-    L     <- parse_laglead_times(L, variables, sf_s)
-    slice_times <- parse_slice_times(data, walk_on, start, step, sf_w)
+    L     <- parse_laglead_times(data, slice_on, L, variables)
+    slice_times <- parse_slice_times(data, walk_on, start, step)
 
     parsed <- list(L, variables, slice_times)
 
