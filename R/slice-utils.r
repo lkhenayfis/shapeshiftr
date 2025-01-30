@@ -58,6 +58,18 @@ parse_start_time <- function(data, walk_on, start, sample_freq) UseMethod("parse
 
 parse_start_time.default <- function(data, walk_on, start, sample_freq) return(start)
 
+parse_start_time.character <- function(data, walk_on, start, sample_freq) {
+    example <- data[[walk_on]][1]
+    class_walk_on <- class(example)
+    if (class_walk_on[1] == "Date") {
+        start <- as.Date(start)
+    } else if (class_walk_on[1] == "POSIXct") {
+        start <- as.POSIXct(start, tz = attr(example, "tzone"))
+    }
+
+    return(start)
+}
+
 parse_start_time.numeric <- function(data, walk_on, start, sample_freq) {
     start <- data[[walk_on]][1] + sample_freq * (start - 1)
     return(start)
