@@ -79,7 +79,7 @@ slice <- function(data, variables, walk_on, slice_on = walk_on,
     )
 
     out <- inner_run(cl, slice_times, iter_fun)
-    out <- do.call(c, out)
+    out <- Reduce(c, out)
 
     run_post_hook(cl)
 
