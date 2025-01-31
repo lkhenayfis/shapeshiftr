@@ -21,7 +21,7 @@ library(data.table)
 # shapeshiftr
 
 <!-- badges: start -->
-[![R-CMD-check](https://github.com/lkhenayfis/shapeshiftr/actions/workflows/check-standard.yaml/badge.svg)](https://github.com/lkhenayfis/shapeshiftr/actions/workflows/check-standard.yaml)
+[![R-CMD-check](https://github.com/lkhenayfis/shapeshiftr/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/lkhenayfis/shapeshiftr/actions/workflows/R-CMD-check.yaml)
 [![test-coverage](https://github.com/lkhenayfis/shapeshiftr/actions/workflows/test-coverage.yaml/badge.svg)](https://github.com/lkhenayfis/shapeshiftr/actions/workflows/test-coverage.yaml)
 <!-- badges: end -->
 
