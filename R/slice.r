@@ -47,6 +47,9 @@
 #'     of the form "2 hours". See \code{\link{difftime}} for which time units are available
 #' @param names naming for each sliced variable; by default this is the same as \code{variables} or,
 #'     if there are duplicates, appends \code{_X} where X is an increasing integer 
+#' @param threads number of threads for parallel execution; if 1, runs single threaded. Parallel
+#'     execution is handled with \code{\link[parallel]{parLapply}} and is only supported in Linux
+#'     based systems
 #' 
 #' @seealso \code{\link{new_slice_artifact}} for in-depth details of the returned object
 #' 
@@ -56,12 +59,12 @@
 #' @export
 
 slice <- function(data, walk_on, slice_on, variables,
-    L = -1, start = 2, step = 1, names = auto_name(variables)) {
+    L = -1, start = 2, step = 1, names = auto_name(variables), threads = 1) {
 
     if (missing("slice_on")) {
-        slice_simple(data, walk_on, variables, L, start, step, names)
+        slice_simple(data, walk_on, variables, L, start, step, names, threads)
     } else {
-        slice_keyed(data, walk_on, slice_on, variables, L, start, step, names)
+        slice_keyed(data, walk_on, slice_on, variables, L, start, step, names, threads)
     }
 }
 
@@ -74,21 +77,33 @@ auto_name <- function(x) {
     return(x)
 }
 
+inner_run <- function(cl, X, fun) UseMethod("inner_run")
+
+inner_run.default <- function(cl, X, fun) lapply(X, fun)
+
+inner_run.cluster <- function(cl, X, fun) parallel::parLapply(cl, X, fun)
+
+run_post_hook <- function(cl) {
+    hook <- attr(cl, "post_hook")
+    hook(cl)
+}
+
 # SLICE SIMPLE DATA --------------------------------------------------------------------------------
 
-parse_simple_slice_args <- function(data, walk_on, variables, L, start, step, names) {
+parse_simple_slice_args <- function(data, walk_on, variables, L, start, step, names, threads) {
 
+    cl <- parse_threads(threads)
     check_index_column(data, walk_on)
     variables <- parse_variables(data, walk_on, NULL, variables)
     L     <- parse_laglead_times(data, walk_on, L, variables)
     slice_times <- parse_slice_times(data, walk_on, start, step)
 
-    parsed <- list(L, variables, slice_times)
+    parsed <- list(L, variables, slice_times, cl)
 
     return(parsed)
 }
 
-slice_simple <- function(data, walk_on, variables, L, start, step, names) {
+slice_simple <- function(data, walk_on, variables, L, start, step, names, threads) {
 
     parsed <- match.call()
     parsed[[1]] <- parse_simple_slice_args
@@ -97,31 +112,35 @@ slice_simple <- function(data, walk_on, variables, L, start, step, names) {
     L <- parsed[[1]]
     variables <- parsed[[2]]
     slice_times <- parsed[[3]]
+    cl <- parsed[[4]]
 
-    out <- lapply(slice_times, function(i) {
-        do_single_slice(data, i, walk_on, variables, L, names)
-    })
+    inner_fun <- function(i) do_single_slice(data, i, walk_on, variables, L, names)
+
+    out <- inner_run(cl, slice_times, inner_fun)
     out <- do.call(c, out)
+
+    run_post_hook(cl)
 
     return(out)
 }
 
 # SLICE KEYED DATA ---------------------------------------------------------------------------------
 
-parse_keyed_slice_args <- function(data, walk_on, slice_on, variables, L, start, step, names) {
+parse_keyed_slice_args <- function(data, walk_on, slice_on, variables, L, start, step, names, threads) {
 
+    cl <- parse_threads(threads)
     check_index_column(data, walk_on)
     check_index_column(data, slice_on)
     variables <- parse_variables(data, walk_on, slice_on, variables)
     L     <- parse_laglead_times(data, slice_on, L, variables)
     slice_times <- parse_slice_times(data, walk_on, start, step)
 
-    parsed <- list(L, variables, slice_times)
+    parsed <- list(L, variables, slice_times, cl)
 
     return(parsed)
 }
 
-slice_keyed <- function(data, walk_on, slice_on, variables, L, start, step, names) {
+slice_keyed <- function(data, walk_on, slice_on, variables, L, start, step, names, threads) {
 
     parsed <- match.call()
     parsed[[1]] <- parse_keyed_slice_args
@@ -130,11 +149,16 @@ slice_keyed <- function(data, walk_on, slice_on, variables, L, start, step, name
     L <- parsed[[1]]
     variables <- parsed[[2]]
     slice_times <- parsed[[3]]
+    cl <- parsed[[4]]
 
-    out  <- lapply(slice_times, function(i) {
+    inner_fun <- function(i) {
         do_single_slice(data[data[[walk_on]] == i], i, slice_on, variables, L, names)
-    })
+    }
+
+    out <- inner_run(cl, slice_times, inner_fun)
     out <- do.call(c, out)
+
+    run_post_hook(cl)
 
     return(out)
 }
