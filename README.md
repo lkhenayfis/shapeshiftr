@@ -7,6 +7,7 @@
 
 [![R-CMD-check](https://github.com/lkhenayfis/shapeshiftr/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/lkhenayfis/shapeshiftr/actions/workflows/R-CMD-check.yaml)
 [![test-coverage](https://github.com/lkhenayfis/shapeshiftr/actions/workflows/test-coverage.yaml/badge.svg)](https://github.com/lkhenayfis/shapeshiftr/actions/workflows/test-coverage.yaml)
+[![codecov](https://codecov.io/gh/lkhenayfis/shapeshiftr/graph/badge.svg?token=JW6LQ7TO2U)](https://codecov.io/gh/lkhenayfis/shapeshiftr)
 <!-- badges: end -->
 
 Package `shapeshiftr` aims at providing a simple and efficient interface
