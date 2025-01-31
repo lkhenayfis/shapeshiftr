@@ -6,23 +6,24 @@
 \usage{
 slice(
   data,
-  walk_on,
-  slice_on,
   variables,
+  walk_on,
+  slice_on = walk_on,
   L = -1,
   start = 2,
   step = 1,
-  names = auto_name(variables)
+  names = auto_name(variables),
+  threads = 1
 )
 }
 \arguments{
 \item{data}{the data.frame-like object on which to operate}
 
+\item{variables}{names of variables for extraction in slicing}
+
 \item{walk_on}{name of the column to use as index for centering each slice. See Details}
 
 \item{slice_on}{name of the column to use as reference for lead/lag slice search. See Details}
-
-\item{variables}{names of variables for extraction in slicing}
 
 \item{L}{lag/lead times of the variables that must be extracted. See Details}
 
@@ -35,6 +36,10 @@ of the form "2 hours". See \code{\link{difftime}} for which time units are avail
 
 \item{names}{naming for each sliced variable; by default this is the same as \code{variables} or,
 if there are duplicates, appends \code{_X} where X is an increasing integer}
+
+\item{threads}{number of threads for parallel execution; if 1, runs single threaded. Parallel
+execution is handled with \code{\link[parallel]{parLapply}} and is only supported in Linux
+based systems}
 }
 \value{
 An \code{slice_artifact} object with the results, see \code{\link{new_slice_artifact}}

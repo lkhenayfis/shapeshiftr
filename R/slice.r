@@ -36,9 +36,9 @@
 #' sliced equally.
 #' 
 #' @param data the data.frame-like object on which to operate
+#' @param variables names of variables for extraction in slicing
 #' @param walk_on name of the column to use as index for centering each slice. See Details
 #' @param slice_on name of the column to use as reference for lead/lag slice search. See Details
-#' @param variables names of variables for extraction in slicing
 #' @param L lag/lead times of the variables that must be extracted. See Details
 #' @param start where the slicing will start. Can be an integer, in which case it is interpreted as
 #'     a line number, or a date-like object, in which case it is interpreted literally
@@ -58,15 +58,35 @@
 #' 
 #' @export
 
-slice <- function(data, walk_on, slice_on, variables,
+slice <- function(data, variables, walk_on, slice_on = walk_on,
     L = -1, start = 2, step = 1, names = auto_name(variables), threads = 1) {
 
-    if (missing("slice_on")) {
-        slice_simple(data, walk_on, variables, L, start, step, names, threads)
-    } else {
-        slice_keyed(data, walk_on, slice_on, variables, L, start, step, names, threads)
-    }
+    parsed <- parse_slice_args(data, variables, walk_on, slice_on, L, start, step, names, threads)
+
+    slice_times <- parsed[[3]]
+    variables   <- parsed[[2]]
+    cl <- parsed[[4]]
+    L  <- parsed[[1]]
+
+    # this could be wrapped in a `generate_inner_function` but there would be some issues. First,
+    # this generator would need to receive data, variables, L and names as args and, so, the
+    # resulting function would point to an environment where copies of all these objects exist
+    # This leads to unnecessary use of memory for large datasets and possibly will cause problems
+    # in parallel execution
+    iter_fun <- ifelse(walk_on == slice_on,
+        function(i) do_single_slice(data, i, walk_on, variables, L, names),
+        function(i) do_single_slice(data[data[[walk_on]] == i], i, slice_on, variables, L, names)
+    )
+
+    out <- inner_run(cl, slice_times, iter_fun)
+    out <- do.call(c, out)
+
+    run_post_hook(cl)
+
+    return(out)
 }
+
+# HELPERS ------------------------------------------------------------------------------------------
 
 auto_name <- function(x) {
     ord <- split(seq_along(x), x)
@@ -88,77 +108,16 @@ run_post_hook <- function(cl) {
     hook(cl)
 }
 
-# SLICE SIMPLE DATA --------------------------------------------------------------------------------
-
-parse_simple_slice_args <- function(data, walk_on, variables, L, start, step, names, threads) {
+parse_slice_args <- function(data, variables, walk_on, slice_on, L, start, step, names, threads) {
 
     cl <- parse_threads(threads)
+    check_index_column(data, walk_on)
     check_index_column(data, walk_on)
     variables <- parse_variables(data, walk_on, NULL, variables)
-    L     <- parse_laglead_times(data, walk_on, L, variables)
+    L <- parse_laglead_times(data, slice_on, L, variables)
     slice_times <- parse_slice_times(data, walk_on, start, step)
 
     parsed <- list(L, variables, slice_times, cl)
 
     return(parsed)
-}
-
-slice_simple <- function(data, walk_on, variables, L, start, step, names, threads) {
-
-    parsed <- match.call()
-    parsed[[1]] <- parse_simple_slice_args
-    parsed <- eval(parsed, parent.frame(), parent.frame())
-
-    L <- parsed[[1]]
-    variables <- parsed[[2]]
-    slice_times <- parsed[[3]]
-    cl <- parsed[[4]]
-
-    inner_fun <- function(i) do_single_slice(data, i, walk_on, variables, L, names)
-
-    out <- inner_run(cl, slice_times, inner_fun)
-    out <- do.call(c, out)
-
-    run_post_hook(cl)
-
-    return(out)
-}
-
-# SLICE KEYED DATA ---------------------------------------------------------------------------------
-
-parse_keyed_slice_args <- function(data, walk_on, slice_on, variables, L, start, step, names, threads) {
-
-    cl <- parse_threads(threads)
-    check_index_column(data, walk_on)
-    check_index_column(data, slice_on)
-    variables <- parse_variables(data, walk_on, slice_on, variables)
-    L     <- parse_laglead_times(data, slice_on, L, variables)
-    slice_times <- parse_slice_times(data, walk_on, start, step)
-
-    parsed <- list(L, variables, slice_times, cl)
-
-    return(parsed)
-}
-
-slice_keyed <- function(data, walk_on, slice_on, variables, L, start, step, names, threads) {
-
-    parsed <- match.call()
-    parsed[[1]] <- parse_keyed_slice_args
-    parsed <- eval(parsed, parent.frame(), parent.frame())
-
-    L <- parsed[[1]]
-    variables <- parsed[[2]]
-    slice_times <- parsed[[3]]
-    cl <- parsed[[4]]
-
-    inner_fun <- function(i) {
-        do_single_slice(data[data[[walk_on]] == i], i, slice_on, variables, L, names)
-    }
-
-    out <- inner_run(cl, slice_times, inner_fun)
-    out <- do.call(c, out)
-
-    run_post_hook(cl)
-
-    return(out)
 }
