@@ -57,7 +57,9 @@ parse_variables <- function(data, walk_on, key_by, variables) {
 
 guess_sample_freq <- function(data, column) {
 
-    freq <- max(diff(data[[column]]))
+    freq <- diff(unique(data[[column]]))
+    freq <- freq[(freq > 0)]
+    freq <- min(freq)
 
     time_type <- class(data[1][[column]])[1]
     unit <- switch(time_type,
