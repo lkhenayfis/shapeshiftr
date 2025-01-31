@@ -6,7 +6,7 @@
 \alias{dwt}
 \title{Discrete Wavelet Transform Method For \code{slice_artifact} Objects}
 \usage{
-\method{dwt}{slice_artifact}(X, variables, ...)
+\method{dwt}{slice_artifact}(X, variables, threads = 1, ...)
 
 \method{dwt}{default}(X, ...)
 
@@ -16,6 +16,10 @@ dwt(X, ...)
 \item{X}{a \code{slice_artifact} object}
 
 \item{variables}{variables on which to perform the discrete wavelet transform}
+
+\item{threads}{number of threads for parallel execution; if 1, runs single threaded. Parallel
+execution is handled with \code{\link[parallel]{parLapply}} and is only supported in Linux
+based systems}
 
 \item{...}{remaining arguments of \code{\link[wavelets]{dwt}}}
 }
