@@ -22,28 +22,19 @@ dwt.slice_artifact <- function(X, variables, ...) {
     new_slice_artifact(wav_list, attr(X, "index"), NA)
 }
 
-format_ws <- function(wt) {
-    ws <- wt@W
-    names <- lapply(names(ws), function(s) paste0(s, "_", seq_len(nrow(ws[[s]]))))
-    ws <- lapply(ws, c)
-    ws <- do.call(c, ws)
-    names(ws) <- do.call(c, names)
-    return(ws)
-}
-
-format_vs <- function(wt) {
-    vs <- wt@V
-    names <- lapply(names(vs), function(s) paste0(s, "_", seq_len(nrow(vs[[s]]))))
-    vs <- lapply(vs, c)
-    vs <- do.call(c, vs)
-    names(vs) <- do.call(c, names)
-    return(vs)
+format_coef <- function(wt, slot) {
+    coef <- slot(wt, slot)
+    names <- lapply(names(coef), function(s) paste0(s, "_", seq_len(nrow(coef[[s]]))))
+    coef <- lapply(coef, c)
+    coef <- do.call(c, coef)
+    names(coef) <- do.call(c, names)
+    return(coef)
 }
 
 build_wavelets_single_variable <- function(l, ...) {
     l_wt <- lapply(l, function(v) dwt(as.numeric(v), ...))
-    ws <- lapply(l_wt, format_ws)
-    vs <- lapply(l_wt, format_vs)
+    ws <- lapply(l_wt, format_coef, "W")
+    vs <- lapply(l_wt, format_coef, "V")
     wavs <- mapply(c, ws, vs, SIMPLIFY = FALSE)
     return(wavs)
 }
