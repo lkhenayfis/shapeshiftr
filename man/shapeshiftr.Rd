@@ -8,8 +8,8 @@
 Automated pipeline for shape manipulation and data transforms
 }
 \details{
-This package intends to unify several kinds of data wrangling under a single framework.
-This includes shape manipulation as well data transformations. All is meant to be easily
-readable and extensible, aiming at greatly simplifying the process of data preparation before
-fitting/using models.
+This package aims at providing a simple and efficient interface for manipulation and
+transformation of data for training forecasting models. This is effectively done through
+"slicing" operations, which transform standard tabular time series data into data.frames usable
+for model fitting/forecasting, as well as diverse transforms.
 }
