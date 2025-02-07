@@ -73,6 +73,33 @@ slice <- function(data, variables, walk_on, slice_on = walk_on,
     return(out)
 }
 
+# SLICING INTERNALS --------------------------------------------------------------------------------
+
+do_single_slice <- function(data, index, params) UseMethod("do_single_slice", params)
+
+do_single_slice.simple <- function(data, index, params) {
+    lst <- extract_lagleads(data, index, params$slice_on, params$variables, params$L)
+    names(lst) <- params$names
+
+    new_slice_artifact(lst, index, params$L)
+}
+
+do_single_slice.keyed <- function(data, index, params) {
+    data_at_index <- data[data[[params$walk_on]] == index]
+    do_single_slice.simple(data_at_index, index, params)
+}
+
+extract_lagleads <- function(data, index, slice_on, variables, L) {
+
+    time_indexes <- lapply(L, function(l) index + l)
+    extracted <- mapply(variables, time_indexes, FUN = function(v, t) {
+        rows <- match(t, data[[slice_on]])
+        list(data[rows][[v]])
+    }, SIMPLIFY = FALSE)
+
+    return(extracted)
+}
+
 # HELPERS ------------------------------------------------------------------------------------------
 
 auto_name <- function(x) {
