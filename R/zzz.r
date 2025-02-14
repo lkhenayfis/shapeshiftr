@@ -4,6 +4,11 @@
     parse_threads(threads)
 }
 
+.onUnload <- function(libname, pkgname) {
+    cl <- get_cluster()
+    run_post_hook(cl)
+}
+
 parse_threads <- function(threads) {
     has_parallel <- requireNamespace("parallel", quietly = TRUE)
     is_multi <- threads > 1
@@ -20,5 +25,3 @@ parse_threads <- function(threads) {
 
     assign(".SHAPESHIFTR_CLUSTER", cl, asNamespace("shapeshiftr"))
 }
-
-get_cluster <- function() get(".SHAPESHIFTR_CLUSTER", envir = asNamespace("shapeshiftr"))
