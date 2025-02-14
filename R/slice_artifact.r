@@ -15,6 +15,36 @@ new_slice_artifact <- function(list, index, L) {
     return(list)
 }
 
+#' Coerce To A \code{slice_artifact}
+#' 
+#' Coerces \code{x} an object to \code{slice_artifact} if possible
+#' 
+#' Currently only data.frames and data.tables can be coerced to \code{slice_artifact}
+#' 
+#' @param x object to be coerced into \code{slice_artifact}
+#' @param ... specific arguments to each method
+#' 
+#' @return an \code{slice_artifact} generated from \code{x}
+
+as.slice_artifact <- function(x, ...) UseMethod("as.slice_artifact", x)
+
+#' @describeIn as.slice_artifact
+#' 
+#' @param index_column column to be used as slice index
+#' 
+#' @export 
+
+as.slice_artifact.data.frame <- function(x, index_column, ...) {
+    rownames(x) <- NULL
+    index <- x[[index_column]]
+    x[[index_column]] <- NULL
+
+    list <- split(x, seq_len(nrow(x)))
+    list <- lapply(list, unlist)
+
+    new_slice_artifact(list, index, list(NA))
+}
+
 # METHODS ------------------------------------------------------------------------------------------
 
 #' Get Dimensions Of \code{slice_artifact} Objects
