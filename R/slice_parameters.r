@@ -1,29 +1,27 @@
 
 # SLICE PARAMETERS ---------------------------------------------------------------------------------
 
-parse_slice_args <- function(data, variables, walk_on, slice_on, L, start, step, names, threads) {
+parse_slice_args <- function(data, variables, walk_on, slice_on, L, start, step, names) {
 
-    cl <- parse_threads(threads)
     check_index_column(data, walk_on)
     check_index_column(data, walk_on)
     variables <- parse_variables(data, walk_on, NULL, variables)
     L <- parse_laglead_times(data, slice_on, L, variables)
     slice_times <- parse_slice_times(data, walk_on, start, step)
 
-    params <- new_slice_parameters(variables, walk_on, slice_on, L, slice_times, names, cl)
+    params <- new_slice_parameters(variables, walk_on, slice_on, L, slice_times, names)
 
     return(params)
 }
 
-new_slice_parameters <- function(variables, walk_on, slice_on, L, slice_times, names, cl) {
+new_slice_parameters <- function(variables, walk_on, slice_on, L, slice_times, names) {
     new <- list(
         variables = variables,
         walk_on = walk_on,
         slice_on = slice_on,
         L = L,
         slice_times = slice_times,
-        names = names,
-        cl = cl
+        names = names
     )
 
     new_class <- ifelse(walk_on == slice_on, "simple_slice_params", "keyed_slice_params")
@@ -36,23 +34,6 @@ new_slice_parameters <- function(variables, walk_on, slice_on, L, slice_times, n
 
 check_index_column <- function(data, walk_on) {
     if (!(walk_on %in% colnames(data))) stop("Column 'walk_on' not found in 'data'")
-}
-
-parse_threads <- function(threads) {
-    has_parallel <- requireNamespace("parallel", quietly = TRUE)
-    is_multi <- threads > 1
-    is_linux <- Sys.info()["sysname"] == "Linux"
-
-    if (!has_parallel) {
-        stop("Package 'parallel' is not installed -- parallel >= 4.3 is required for parallel execution")
-    }
-    if (!is_multi) return(structure(list(), post_hook = function(cl) NULL))
-    if (!is_linux) stop("Multithreading is only supported on Linux platforms")
-
-    cl <- parallel::makeCluster(threads, "FORK")
-    attr(cl, "post_hook") <- function(cl) parallel::stopCluster(cl)
-
-    return(cl)
 }
 
 parse_variables <- function(data, walk_on, key_by, variables) {
