@@ -2,6 +2,9 @@
 .onLoad <- function(libname, pkgname) {
     threads <- as.numeric(Sys.getenv("SHAPESHIFTR_THREADS", 0))
     parse_threads(threads)
+
+    msg <- generate_msg(threads)
+    packageStartupMessage(msg)
 }
 
 .onUnload <- function(libname, pkgname) {
@@ -24,4 +27,15 @@ parse_threads <- function(threads) {
     attr(cl, "post_hook") <- function(cl) parallel::stopCluster(cl)
 
     assign(".SHAPESHIFTR_CLUSTER", cl, asNamespace("shapeshiftr"))
+}
+
+generate_msg <- function(threads) {
+    if (threads > 1) {
+        msg <- paste0("'shapeshifter' is running multithreated with ", threads, " threads")
+    } else {
+        msg <- paste0("'shapeshifter' is running singlethreaded")
+    }
+
+    msg <- paste0(msg, " -- See ?shapeshiftr_threads for more details")
+    return(msg)
 }
