@@ -2,11 +2,11 @@
 test_that("new_slice_parameters", {
     params <- parse_slice_args(
         simple_dt_date, c("X1", "X2"), "date", "date", 1, 1, 1, c("X1", "X2"), 1)
-    expect_true(inherits(params, "simple"))
+    expect_true(inherits(params, "simple_slice_params"))
 
     params <- parse_slice_args(
         keyed_dt_date, c("X1", "X2"), "date", "target_date", 1, 1, 1, c("X1", "X2"), 1)
-    expect_true(inherits(params, "keyed"))
+    expect_true(inherits(params, "keyed_slice_params"))
 })
 
 test_that("check_index_column", {
