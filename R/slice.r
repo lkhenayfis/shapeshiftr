@@ -62,42 +62,41 @@ slice <- function(data, variables, walk_on, slice_on = walk_on,
     L = -1, start = 2, step = 1, names = auto_name(variables), threads = 1) {
 
     params <- parse_slice_args(data, variables, walk_on, slice_on, L, start, step, names, threads)
-    slice_times <- params$slice_times
-    cluster     <- params$cl
-
-    out <- inner_run(cluster, slice_times, function(i) do_single_slice(data, i, params))
-    out <- Reduce(c, out)
-
-    run_post_hook(cluster)
+    out <- do_slices(data, params)
 
     return(out)
 }
 
 # SLICING INTERNALS --------------------------------------------------------------------------------
 
+do_slices <- function(data, params) {
+    slices <- inner_run(
+        params$cluster,
+        params$slice_times,
+        function(i) do_single_slice(data, i, params)
+    )
+    slices <- Reduce(c, slices)
+
+    return(slices)
+}
+
 do_single_slice <- function(data, index, params) UseMethod("do_single_slice", params)
 
 do_single_slice.simple <- function(data, index, params) {
-    lst <- extract_lagleads(data, index, params$slice_on, params$variables, params$L)
-    names(lst) <- params$names
 
-    new_slice_artifact(lst, index, params$L)
-}
-
-do_single_slice.keyed <- function(data, index, params) {
-    data_at_index <- data[data[[params$walk_on]] == index]
-    do_single_slice.simple(data_at_index, index, params)
-}
-
-extract_lagleads <- function(data, index, slice_on, variables, L) {
-
-    time_indexes <- lapply(L, function(l) index + l)
-    extracted <- mapply(variables, time_indexes, FUN = function(v, t) {
-        rows <- match(t, data[[slice_on]])
+    time_indexes <- lapply(params$L, function(l) index + l)
+    slice <- mapply(params$variables, time_indexes, FUN = function(v, t) {
+        rows <- match(t, data[[params$slice_on]])
         list(data[rows][[v]])
     }, SIMPLIFY = FALSE)
 
-    return(extracted)
+    names(slice) <- params$names
+
+    new_slice_artifact(slice, index, params$L)
+}
+
+do_single_slice.keyed <- function(data, index, params) {
+    do_single_slice.simple(data[get(params$walk_on) == index], index, params)
 }
 
 # HELPERS ------------------------------------------------------------------------------------------
