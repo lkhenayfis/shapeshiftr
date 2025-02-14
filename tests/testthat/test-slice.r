@@ -206,3 +206,74 @@ test_that("do_single_slice - POSIX", {
     expect_equal(slice$name_1[[1]], c(36, 91, NA, NA))
     expect_equal(slice$name_2[[1]], c(-42, NA))
 })
+
+test_that("do_slices", {
+
+    # simple -------------------------------------------------------------
+
+    params <- generate_simple_params("date")
+    slices <- do_slices(simple_dt_date, params)
+    expect_equal(attr(slices, "index"), simple_dt_date$date)
+
+    center <- as.Date("2025-01-02")
+    compare <- do_single_slice(simple_dt_date, center, params)
+    expect_equal(slices[, center], compare)
+
+    center <- as.Date("2025-01-10")
+    compare <- do_single_slice(simple_dt_date, center, params)
+    expect_equal(slices[, center], compare)
+
+    center <- as.Date("2025-01-21")
+    compare <- do_single_slice(simple_dt_date, center, params)
+    expect_equal(slices[, center], compare)
+
+    params <- generate_simple_params("datetime")
+    slices <- do_slices(simple_dt_datetime, params)
+    expect_equal(attr(slices, "index"), simple_dt_datetime$datetime)
+
+    center <- as.POSIXct("2025-01-01 01:00:00", "GMT")
+    compare <- do_single_slice(simple_dt_datetime, center, params)
+    expect_equal(slices[, center], compare)
+
+    center <- as.POSIXct("2025-01-01 10:00:00", "GMT")
+    compare <- do_single_slice(simple_dt_datetime, center, params)
+    expect_equal(slices[, center], compare)
+
+    center <- as.POSIXct("2025-01-01 20:00:00", "GMT")
+    compare <- do_single_slice(simple_dt_datetime, center, params)
+    expect_equal(slices[, center], compare)
+
+    # keyed --------------------------------------------------------------
+
+    params <- generate_keyed_params("date")
+    slices <- do_slices(keyed_dt_date[1:97], params)
+    expect_equal(attr(slices, "index"), unique(keyed_dt_date$date))
+
+    center <- as.Date("2025-01-02")
+    compare <- do_single_slice(keyed_dt_date[1:97], center, params)
+    expect_equal(slices[, center], compare)
+
+    center <- as.Date("2025-01-10")
+    compare <- do_single_slice(keyed_dt_date[1:97], center, params)
+    expect_equal(slices[, center], compare)
+
+    center <- as.Date("2025-01-21")
+    compare <- do_single_slice(keyed_dt_date[1:97], center, params)
+    expect_equal(slices[, center], compare)
+
+    params <- generate_keyed_params("datetime")
+    slices <- do_slices(keyed_dt_datetime[1:97], params)
+    expect_equal(attr(slices, "index"), unique(keyed_dt_datetime$datetime))
+
+    center <- as.POSIXct("2025-01-01 01:00:00", "GMT")
+    compare <- do_single_slice(keyed_dt_datetime[1:97], center, params)
+    expect_equal(slices[, center], compare)
+
+    center <- as.POSIXct("2025-01-01 10:00:00", "GMT")
+    compare <- do_single_slice(keyed_dt_datetime[1:97], center, params)
+    expect_equal(slices[, center], compare)
+
+    center <- as.POSIXct("2025-01-01 20:00:00", "GMT")
+    compare <- do_single_slice(keyed_dt_datetime[1:97], center, params)
+    expect_equal(slices[, center], compare)
+})
