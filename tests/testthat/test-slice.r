@@ -9,8 +9,7 @@ generate_simple_params <- function(type = c("date", "datetime")) {
             list(-3:0, 1:2),
             1,
             1,
-            c("name_1", "name_2"),
-            1
+            c("name_1", "name_2")
         )
     } else {
         parse_slice_args(simple_dt_datetime,
@@ -20,8 +19,7 @@ generate_simple_params <- function(type = c("date", "datetime")) {
             list(-3:0, 1:2),
             1,
             1,
-            c("name_1", "name_2"),
-            1
+            c("name_1", "name_2")
         )
     }
 }
@@ -36,8 +34,7 @@ generate_keyed_params <- function(type = c("date", "datetime")) {
             list(0:3, 1:2),
             1,
             1,
-            c("name_1", "name_2"),
-            1
+            c("name_1", "name_2")
         )
     } else {
         parse_slice_args(keyed_dt_datetime,
@@ -47,8 +44,7 @@ generate_keyed_params <- function(type = c("date", "datetime")) {
             list(0:3, 1:2),
             1,
             1,
-            c("name_1", "name_2"),
-            1
+            c("name_1", "name_2")
         )
     }
 }

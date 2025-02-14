@@ -46,10 +46,7 @@
 #'     interpreted as number of intervals in the temporal resolution of \code{walk_on}, or a string
 #'     of the form "2 hours". See \code{\link{difftime}} for which time units are available
 #' @param names naming for each sliced variable; by default this is the same as \code{variables} or,
-#'     if there are duplicates, appends \code{_X} where X is an increasing integer 
-#' @param threads number of threads for parallel execution; if 1, runs single threaded. Parallel
-#'     execution is handled with \code{\link[parallel]{parLapply}} and is only supported in Linux
-#'     based systems
+#'     if there are duplicates, appends \code{_X} where X is an increasing integer
 #' 
 #' @seealso \code{\link{new_slice_artifact}} for in-depth details of the returned object
 #' 
@@ -59,9 +56,9 @@
 #' @export
 
 slice <- function(data, variables, walk_on, slice_on = walk_on,
-    L = -1, start = 2, step = 1, names = auto_name(variables), threads = 1) {
+    L = -1, start = 2, step = 1, names = auto_name(variables)) {
 
-    params <- parse_slice_args(data, variables, walk_on, slice_on, L, start, step, names, threads)
+    params <- parse_slice_args(data, variables, walk_on, slice_on, L, start, step, names)
     out <- do_slices(data, params)
 
     return(out)
@@ -70,8 +67,7 @@ slice <- function(data, variables, walk_on, slice_on = walk_on,
 # SLICING INTERNALS --------------------------------------------------------------------------------
 
 do_slices <- function(data, params) {
-    slices <- inner_run(
-        params$cluster,
+    slices <- run_loop(
         params$slice_times,
         function(i) do_single_slice(data, i, params)
     )
