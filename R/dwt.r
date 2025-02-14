@@ -5,9 +5,6 @@
 #' 
 #' @param X a \code{slice_artifact} object
 #' @param variables variables on which to perform the discrete wavelet transform
-#' @param threads number of threads for parallel execution; if 1, runs single threaded. Parallel
-#'     execution is handled with \code{\link[parallel]{parLapply}} and is only supported in Linux
-#'     based systems
 #' @param ... remaining arguments of \code{\link[wavelets]{dwt}}
 #' 
 #' @import wavelets
@@ -16,11 +13,11 @@
 #' 
 #' @export
 
-dwt.slice_artifact <- function(X, variables, threads = 1, ...) {
+dwt.slice_artifact <- function(X, variables, ...) {
     if (missing("variables")) variables <- names(X)
 
     X <- na.exclude(X)
-    wav_list <- lapply(X[variables], build_wavelets_single_variable, threads, ...)
+    wav_list <- lapply(X[variables], build_wavelets_single_variable, ...)
 
     new_slice_artifact(wav_list, attr(X, "index"), NA)
 }
@@ -34,10 +31,8 @@ format_coef <- function(wt, slot) {
     return(coef)
 }
 
-build_wavelets_single_variable <- function(l, threads, ...) {
-    cl <- parse_threads(threads)
-    l_wt <- inner_run(cl, l, function(v) dwt(as.numeric(v), ...))
-    run_post_hook(cl)
+build_wavelets_single_variable <- function(l, ...) {
+    l_wt <- run_loop(l, function(v) dwt(as.numeric(v), ...))
     ws <- lapply(l_wt, format_coef, "W")
     vs <- lapply(l_wt, format_coef, "V")
     wavs <- mapply(c, ws, vs, SIMPLIFY = FALSE)
