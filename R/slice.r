@@ -82,7 +82,7 @@ do_slices <- function(data, params) {
 
 do_single_slice <- function(data, index, params) UseMethod("do_single_slice", params)
 
-do_single_slice.simple <- function(data, index, params) {
+do_single_slice.simple_slice_params <- function(data, index, params) {
 
     time_indexes <- lapply(params$L, function(l) index + l)
     slice <- mapply(params$variables, time_indexes, FUN = function(v, t) {
@@ -95,8 +95,8 @@ do_single_slice.simple <- function(data, index, params) {
     new_slice_artifact(slice, index, params$L)
 }
 
-do_single_slice.keyed <- function(data, index, params) {
-    do_single_slice.simple(data[get(params$walk_on) == index], index, params)
+do_single_slice.keyed_slice_params <- function(data, index, params) {
+    do_single_slice.simple_slice_params(data[get(params$walk_on) == index], index, params)
 }
 
 # HELPERS ------------------------------------------------------------------------------------------

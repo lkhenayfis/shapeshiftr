@@ -26,7 +26,7 @@ new_slice_parameters <- function(variables, walk_on, slice_on, L, slice_times, n
         cl = cl
     )
 
-    new_class <- ifelse(walk_on == slice_on, "simple", "keyed")
+    new_class <- ifelse(walk_on == slice_on, "simple_slice_params", "keyed_slice_params")
     class(new) <- c(new_class, "list")
 
     return(new)
