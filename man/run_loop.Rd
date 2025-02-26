@@ -9,7 +9,7 @@ run_loop(X, fun)
 \arguments{
 \item{X}{iterable collection}
 
-\item{function}{to be applied}
+\item{fun}{to be applied}
 }
 \value{
 list with results of applying \code{fun} to each element of \code{X}

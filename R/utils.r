@@ -42,7 +42,7 @@ refresh_cluster.cluster <- function(cl, envir) {
 #' Simple wrapper to run loops, either single or multithreaded
 #' 
 #' @param X iterable collection
-#' @param function to be applied
+#' @param fun to be applied
 #' 
 #' @return list with results of applying \code{fun} to each element of \code{X}
 
@@ -58,12 +58,16 @@ run_loop <- function(X, fun) {
 #' 
 #' @param cl either an object of type \code{cluster} or NULL
 #' @param X iterable collection
-#' @param function to be applied
+#' @param fun to be applied
 #' 
 #' @return list with results of applying \code{fun} to each element of \code{X}
 
 inner_run <- function(cl, X, fun) UseMethod("inner_run")
 
+#' @rdname inner_run
+
 inner_run.default <- function(cl, X, fun) lapply(X, fun)
+
+#' @rdname inner_run
 
 inner_run.cluster <- function(cl, X, fun) parallel::parLapply(cl, X, fun)

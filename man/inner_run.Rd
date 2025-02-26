@@ -2,16 +2,22 @@
 % Please edit documentation in R/utils.r
 \name{inner_run}
 \alias{inner_run}
+\alias{inner_run.default}
+\alias{inner_run.cluster}
 \title{Generic Loop Execution}
 \usage{
 inner_run(cl, X, fun)
+
+\method{inner_run}{default}(cl, X, fun)
+
+\method{inner_run}{cluster}(cl, X, fun)
 }
 \arguments{
 \item{cl}{either an object of type \code{cluster} or NULL}
 
 \item{X}{iterable collection}
 
-\item{function}{to be applied}
+\item{fun}{to be applied}
 }
 \value{
 list with results of applying \code{fun} to each element of \code{X}
