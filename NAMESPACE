@@ -2,6 +2,7 @@
 
 S3method("[",slice_artifact)
 S3method(as.data.table,slice_artifact)
+S3method(as.slice_artifact,data.frame)
 S3method(c,slice_artifact)
 S3method(dim,slice_artifact)
 S3method(dwt,default)

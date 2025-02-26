@@ -56,7 +56,7 @@
 #' @export
 
 slice <- function(data, variables, walk_on, slice_on = walk_on,
-    L = -1, start = 2, step = 1, names = auto_name(variables)) {
+    L = -1, start = 1, step = 1, names = auto_name(variables)) {
 
     params <- parse_slice_args(data, variables, walk_on, slice_on, L, start, step, names)
     out <- do_slices(data, params)

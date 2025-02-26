@@ -10,7 +10,7 @@ slice(
   walk_on,
   slice_on = walk_on,
   L = -1,
-  start = 2,
+  start = 1,
   step = 1,
   names = auto_name(variables)
 )
