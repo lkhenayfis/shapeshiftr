@@ -1,5 +1,4 @@
 
-
 generate_msg <- function(threads) {
     if (threads > 1) {
         msg <- paste0("'shapeshifter' is running multithreated with ", threads, " threads")
@@ -14,7 +13,10 @@ generate_msg <- function(threads) {
 .onLoad <- function(libname, pkgname) {
     threads <- as.numeric(Sys.getenv("SHAPESHIFTR_THREADS", 0))
     set_up_cluster(threads)
+}
 
+.onAttach <- function(libname, pkgname) {
+    threads <- as.numeric(Sys.getenv("SHAPESHIFTR_THREADS", 0))
     msg <- generate_msg(threads)
     packageStartupMessage(msg)
 }
