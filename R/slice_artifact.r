@@ -135,7 +135,7 @@ c_two_slices <- function(s1, s2) {
     indexes_keep <- attr(x, "index") %in% j
     list_i_j <- lapply(list_i, function(l) l[indexes_keep])
 
-    new_slice_artifact(list_i_j, j, L)
+    new_slice_artifact(list_i_j, attr(x, "index")[indexes_keep], L)
 }
 
 #' Merges \code{slice_artifact} Objects
