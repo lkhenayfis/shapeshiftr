@@ -34,7 +34,7 @@ set_up_cluster <- function(threads) {
     if (!has_parallel) {
         stop("Package 'parallel' is not installed -- parallel >= 4.3 is required for parallel execution")
     }
-    if (!is_linux) stop("Multithreading is only supported on Linux platforms")
+    if (is_multi && !is_linux) stop("Multithreading is only supported on Linux platforms")
 
     if (!is_multi) {
         cl <- structure(list(), post_hook = function(cl) NULL)
