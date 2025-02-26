@@ -1,4 +1,48 @@
 
+#' Configures Internal Package Cluster
+#' 
+#' Sets up a FORK cluster of \code{threads} threads, if running on linux platforms
+#' 
+#' This is an internal function, should not be called directly by the user
+#' 
+#' @param threads number of cluster threads
+#' 
+#' @return has no explicit return. Assings a FORK cluster to name \code{.SHAPESHIFTR_CLUSTER} in the
+#'     package's namespace, if code{threads > 1}, or a NULL object otherwise
+
+set_up_cluster <- function(threads) {
+    has_parallel <- requireNamespace("parallel", quietly = TRUE)
+    is_multi <- threads > 1
+    is_linux <- Sys.info()["sysname"] == "Linux"
+
+    if (!has_parallel) {
+        stop("Package 'parallel' is not installed -- parallel >= 4.3 is required for parallel execution")
+    }
+    if (is_multi && !is_linux) stop("Multithreading is only supported on Linux platforms")
+
+    if (!is_multi) {
+        cl <- structure(list(), post_hook = function(cl) NULL)
+    } else {
+        cl <- parallel::makeCluster(threads, "FORK")
+        attr(cl, "post_hook") <- function(cl) parallel::stopCluster(cl)
+    }
+
+    assign(".SHAPESHIFTR_CLUSTER", cl, asNamespace("shapeshiftr"))
+}
+
+#' Treatment Of Cluster On Package Unload
+#' 
+#' If \code{cl} is a cluster, stops it
+#' 
+#' @param cl cluster or NULL
+#' 
+#' @return no explicit return, only stops \code{cl} if it is a cluster, or does nothing otherwise
+
+run_post_hook <- function(cl) {
+    hook <- attr(cl, "post_hook")
+    hook(cl)
+}
+
 #' Gets Internal \code{shapeshiftr} Cluster
 #' 
 #' Internal function for accessing package dedicated cluster

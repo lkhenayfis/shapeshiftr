@@ -25,28 +25,3 @@ generate_msg <- function(threads) {
     cl <- get_cluster()
     run_post_hook(cl)
 }
-
-set_up_cluster <- function(threads) {
-    has_parallel <- requireNamespace("parallel", quietly = TRUE)
-    is_multi <- threads > 1
-    is_linux <- Sys.info()["sysname"] == "Linux"
-
-    if (!has_parallel) {
-        stop("Package 'parallel' is not installed -- parallel >= 4.3 is required for parallel execution")
-    }
-    if (is_multi && !is_linux) stop("Multithreading is only supported on Linux platforms")
-
-    if (!is_multi) {
-        cl <- structure(list(), post_hook = function(cl) NULL)
-    } else {
-        cl <- parallel::makeCluster(threads, "FORK")
-        attr(cl, "post_hook") <- function(cl) parallel::stopCluster(cl)
-    }
-
-    assign(".SHAPESHIFTR_CLUSTER", cl, asNamespace("shapeshiftr"))
-}
-
-run_post_hook <- function(cl) {
-    hook <- attr(cl, "post_hook")
-    hook(cl)
-}
