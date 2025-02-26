@@ -1,6 +1,6 @@
 Package: shapeshiftr
 Title: Automated pipeline for shape manipulation and data transforms
-Version: 0.1
+Version: 0.2
 Authors@R: 
     person("Lucas", "Khenayfis", , "lucaskhenayfus@gmail.com", role = c("aut", "cre"))
 Description: This package aims at providing a simple and efficient interface for manipulation and 
