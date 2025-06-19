@@ -11,7 +11,7 @@ set_up_cluster(threads)
 }
 \value{
 has no explicit return. Assings a FORK cluster to name \code{.SHAPESHIFTR_CLUSTER} in the
-package's namespace, if code{threads > 1}, or a NULL object otherwise
+package's namespace, if \code{threads > 1}, or a NULL object otherwise
 }
 \description{
 Sets up a FORK cluster of \code{threads} threads, if running on linux platforms

@@ -24,9 +24,9 @@
 
 \method{tail}{slice_artifact}(x, variables, ...)
 
-\method{median}{slice_artifact}(x, variables, ...)
+\method{median}{slice_artifact}(x, na.rm = FALSE, variables, ...)
 
-\method{summary}{slice_artifact}(x, variables, ...)
+\method{summary}{slice_artifact}(object, variables, ...)
 
 \method{sd}{slice_artifact}(x, variables, ...)
 
@@ -40,6 +40,10 @@
 \item{variables}{variables on which to compute function}
 
 \item{...}{remaining arguments passed on to generic}
+
+\item{na.rm}{boolean indicating if \code{NA}s should be ignored}
+
+\item{object}{a \code{slice_artifact} object}
 }
 \value{
 \code{slice_artifact} with computed function on all slices of specified \code{variables}

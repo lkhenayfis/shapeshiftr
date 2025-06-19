@@ -8,7 +8,7 @@
 #' @param threads number of cluster threads
 #' 
 #' @return has no explicit return. Assings a FORK cluster to name \code{.SHAPESHIFTR_CLUSTER} in the
-#'     package's namespace, if code{threads > 1}, or a NULL object otherwise
+#'     package's namespace, if \code{threads > 1}, or a NULL object otherwise
 
 set_up_cluster <- function(threads) {
     has_parallel <- requireNamespace("parallel", quietly = TRUE)

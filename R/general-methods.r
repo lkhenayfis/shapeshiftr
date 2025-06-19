@@ -58,29 +58,46 @@ tail.slice_artifact <- function(x, variables, ...) {
 
 # STATS METHODS ------------------------------------------------------------------------------------
 
+#' @param na.rm boolean indicating if `NA`s should be ignored
+#' 
 #' @export
 #' 
 #' @rdname general-methods
 
-median.slice_artifact <- function(x, variables, ...) {
+median.slice_artifact <- function(x, na.rm = FALSE, variables, ...) {
     INNER_METHOD_RUN(x, variables, median, ...)
 }
 
+#' @param object a `slice_artifact` object
+#' 
 #' @export
 #' 
 #' @rdname general-methods
 
-summary.slice_artifact <- function(x, variables, ...) {
-    INNER_METHOD_RUN(x, variables, summary, ...)
+summary.slice_artifact <- function(object, variables, ...) {
+    INNER_METHOD_RUN(object, variables, summary, ...)
 }
 
+#' Mock Generic For Standard Deviation
+#' 
+#' Reexports the [stats::sd()] function as a generic so new methods can be created
+#' 
+#' @param x a `slice_artifact` object
+#' @param ... remaining arguments of [stats::sd()]
+#' 
+#' @importFrom stats sd
+#' 
+#' @seealso [general-methods]
+#' 
 #' @export
 
-sd <- function(x, na.rm = FALSE) UseMethod("sd")
+sd <- function(x, ...) UseMethod("sd")
 
+#' @rdname sd
+#' 
 #' @export
 
-sd.default <- function(x, na.rm = FALSE) stats::sd(x, na.rm)
+sd.default <- function(x, ...) stats::sd(x, ...)
 
 #' @export
 #' 
@@ -90,13 +107,26 @@ sd.slice_artifact <- function(x, variables, ...) {
     INNER_METHOD_RUN(x, variables, sd, ...)
 }
 
+#' Mock Generic For Variance
+#' 
+#' Reexports the [stats::var()] function as a generic so new methods can be created
+#' 
+#' @param x a `slice_artifact` object
+#' @param ... remaining arguments of [stats::var()]
+#' 
+#' @importFrom stats var
+#' 
+#' @seealso [general-methods]
+#' 
 #' @export
 
-var <- function(x, y = NULL, na.rm = FALSE, use) UseMethod("var")
+var <- function(x, ...) UseMethod("var")
 
+#' @rdname var
+#' 
 #' @export
 
-var.default <- function(x, y = NULL, na.rm = FALSE, use) stats::var(x, y, na.rm, use)
+var.default <- function(x, ...) stats::var(x, ...)
 
 #' @export
 #' 
