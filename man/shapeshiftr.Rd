@@ -2,6 +2,7 @@
 % Please edit documentation in R/shapeshiftr.r
 \docType{package}
 \name{shapeshiftr}
+\alias{shapeshiftr-package}
 \alias{shapeshiftr}
 \title{Package \code{shapeshiftr}}
 \description{
@@ -12,4 +13,8 @@ This package aims at providing a simple and efficient interface for manipulation
 transformation of data for training forecasting models. This is effectively done through
 "slicing" operations, which transform standard tabular time series data into data.frames usable
 for model fitting/forecasting, as well as diverse transforms.
+}
+\author{
+\strong{Maintainer}: Lucas Khenayfis \email{lucaskhenayfus@gmail.com}
+
 }

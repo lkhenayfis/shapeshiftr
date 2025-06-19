@@ -7,8 +7,7 @@
 #' "slicing" operations, which transform standard tabular time series data into data.frames usable 
 #' for model fitting/forecasting, as well as diverse transforms.
 #' 
-#' @docType package
 #' @name shapeshiftr
 #' 
 #' @import stats utils data.table
-NULL
+"_PACKAGE"
