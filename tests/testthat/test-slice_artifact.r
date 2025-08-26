@@ -58,7 +58,7 @@ test_that("`[.slice_artifact`", {
     expect_true(inherits(sub_var, "slice_artifact"))
     expect_equal(simple_date$X1, sub_var$X1)
     expect_equal(attr(simple_date, "index"), attr(sub_var, "index"))
-    expect_equal(attr(simple_date, "L"), attr(sub_var, "L"))
+    expect_equal(attr(simple_date, "L")[c("X1")], attr(sub_var, "L"))
 
     indexes <- c("2025-01-02", "2025-01-03", "2025-01-05")
     integer_indexes <- match(indexes, attr(simple_date, "index"))
