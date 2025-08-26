@@ -71,10 +71,9 @@ past values for fitting an autoregressive model.
 
 Lag and lead times, passed through argument \code{L}, are differentiated by their sign. Negative
 values are interpreted as lags and positive ones as leads. The canonical way to pass this
-argument is as list indicating lags/leads for each variable, in the same order as
-\code{variables}. If unamed, it is assumed \code{L} is in the same order as \code{variables}.
-If \code{L} is a single integer or vector of integers, it is assumed all variables should be
-sliced equally.
+argument is a names list indicating lags/leads for each variable. If unamed, it is assumed
+\code{L} is in the same order as \code{variables}. If \code{L} is a single integer or vector of
+integers, it is assumed all variables should be sliced equally.
 }
 \seealso{
 \code{\link{new_slice_artifact}} for in-depth details of the returned object

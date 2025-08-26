@@ -17,3 +17,7 @@ along the merged one}
 \description{
 Concatenates two features of a slice into a single one
 }
+\details{
+When combining two different features will also combine their \code{L}s, which might end up in a
+meaningless value of lag/leads.
+}

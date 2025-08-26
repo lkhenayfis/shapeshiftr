@@ -10,6 +10,11 @@
 
 \method{names}{slice_artifact}(x) <- value
 }
+\arguments{
+\item{x}{object of class \code{slice_artifact}}
+
+\item{value}{vector of new names}
+}
 \description{
 Functions for getting names of variables and renaming them in an \code{slice_artifact} object
 }

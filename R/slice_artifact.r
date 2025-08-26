@@ -51,6 +51,9 @@ as.slice_artifact.data.frame <- function(x, index_column, ...) {
 #' 
 #' Functions for getting names of variables and renaming them in an `slice_artifact` object
 #' 
+#' @param x object of class `slice_artifact`
+#' @param value vector of new names
+#' 
 #' @name names_slice_artifact
 NULL
 
