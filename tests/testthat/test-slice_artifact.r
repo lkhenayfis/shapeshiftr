@@ -78,11 +78,7 @@ test_that("merge.slice_artifact", {
     simple_date_y  <- simple_date["Y"]
 
     merged <- merge(simple_date_x1, simple_date_y)
-    expect_true(inherits(merged, "slice_artifact"))
-    expect_equal(simple_date$X1, merged$X1)
-    expect_equal(simple_date$Y, merged$Y)
-    expect_equal(attr(simple_date, "index"), attr(merged, "index"))
-    expect_true(is.na(attr(merged, "L")))
+    expect_identical(merged, simple_date)
 
     simple_date_x1 <- simple_date["X1", c("2025-01-02", "2025-01-04", "2025-01-05", "2025-01-07")]
     simple_date_y  <- simple_date["Y",  c("2025-01-03", "2025-01-04", "2025-01-05", "2025-01-07")]
@@ -92,7 +88,7 @@ test_that("merge.slice_artifact", {
     expect_equal(simple_date$X1[c(3, 4, 6)], merged$X1)
     expect_equal(simple_date$Y[c(3, 4, 6)], merged$Y)
     expect_equal(attr(simple_date, "index")[c(3, 4, 6)], attr(merged, "index"))
-    expect_true(is.na(attr(merged, "L")))
+    expect_equal(attr(merged, "L"), attr(simple_date, "L"))
 })
 
 test_that("na.exclude.slice_artifact", {

@@ -184,8 +184,9 @@ inner_merge_slices <- function(s1, s2) {
     names(s2)      <- attr_s2$names
 
     list <- c(s1, s2)
+    Ls   <- c(attr_s1$L, attr_s2$L)
 
-    new_slice_artifact(list, attr_s1$index, NA)
+    new_slice_artifact(list, attr_s1$index, Ls)
 }
 
 #' Remove \code{NA} From Slices
