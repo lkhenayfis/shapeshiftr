@@ -212,6 +212,9 @@ na.exclude.slice_artifact <- function(object, ...) {
 #' 
 #' Concatenates two features of a slice into a single one
 #' 
+#' When combining two different features will also combine their `L`s, which might end up in a
+#' meaningless value of lag/leads.
+#' 
 #' @param slice a \code{slice_artifact} object
 #' @param feature1,feature2 the features which will be combined into one
 #' @param return.all boolean indicating if the returned object should contain all remaining features
@@ -222,18 +225,26 @@ na.exclude.slice_artifact <- function(object, ...) {
 combine_features <- function(slice, feature1, feature2, return.all = FALSE) {
 
     all_features <- names(slice)
+    new_name <- paste0(feature1, "_c_", feature2)
 
     comb_list <- slice[c(feature1, feature2)]
     comb_list <- list(mapply(c, slice[[feature1]], slice[[feature2]], SIMPLIFY = FALSE))
-    names(comb_list) <- paste0(feature1, "_c_", feature2)
+    names(comb_list) <- new_name
+
+    Ls <- attr(slice, "L")
+    comb_L <- list(c(Ls[[feature1]], Ls[[feature2]]))
+    names(comb_L) <- new_name
 
     if (return.all) {
-        all <- slice[!(names(slice) %in% c(feature1, feature2))]
-        all <- c(unclass(all), unclass(comb_list))
+        all_vars <- slice[!(names(slice) %in% c(feature1, feature2))]
+        all_vars <- c(unclass(all_vars), unclass(comb_list))
 
-        new_slice_artifact(all, attr(slice, "index"), NA)
+        all_Ls <- Ls[!(names(Ls) %in% c(feature1, feature2))]
+        all_Ls <- c(all_Ls, comb_L)
+
+        new_slice_artifact(all_vars, attr(slice, "index"), all_Ls)
     } else {
-        new_slice_artifact(comb_list, attr(slice, "index"), NA)
+        new_slice_artifact(comb_list, attr(slice, "index"), comb_L)
     }
 }
 

@@ -110,7 +110,22 @@ test_that("combine_features", {
     expect_equal(names(combined), "X1_c_Y")
     expect_equal(combined$X1_c_Y, outer_comb)
     expect_equal(attr(combined, "index"), attr(simple_date, "index"))
-    expect_true(is.na(attr(combined, "L")))
+    expect_equal(attr(combined, "L"), list("X1_c_Y" = Reduce("c", attr(simple_date, "L"))))
+
+    # return.all = TRUE
+
+    simple_date_2 <- slice(simple_dt_date, c("X1", "Y", "X2"), "date",
+        L = list(X1 = -4:0, X2 = -1:1, Y = 1:3))
+
+    outer_comb <- mapply(c, simple_date_2$X1, simple_date_2$Y, SIMPLIFY = FALSE)
+    outer_L <- c(list(X2 = -1:1), list(X1_c_Y = -4:3))
+
+    combined <- combine_features(simple_date_2, "X1", "Y", TRUE)
+    expect_true(inherits(combined, "slice_artifact"))
+    expect_equal(names(combined), c("X2", "X1_c_Y"))
+    expect_equal(combined$X1_c_Y, outer_comb)
+    expect_equal(attr(combined, "index"), attr(simple_date_2, "index"))
+    expect_equal(attr(combined, "L"), outer_L)
 })
 
 test_that("as.data.table.slice_artifact", {
