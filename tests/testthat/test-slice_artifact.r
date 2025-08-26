@@ -69,6 +69,14 @@ test_that("`[.slice_artifact`", {
     expect_equal(simple_date$Y[integer_indexes], sub_index$Y)
     expect_equal(attr(simple_date, "index")[integer_indexes], attr(sub_index, "index"))
     expect_equal(attr(simple_date, "L"), attr(sub_index, "L"))
+
+    # integer subsets
+
+    sub_var_int <- simple_date[1]
+    expect_identical(sub_var, sub_var_int)
+
+    sub_index_int <- simple_date[, c(1, 2, 4)]
+    expect_identical(sub_index, sub_index_int)
 })
 
 test_that("merge.slice_artifact", {

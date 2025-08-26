@@ -127,6 +127,9 @@ c_two_slices <- function(s1, s2) {
     if (missing("i")) i <- names(x)
     if (missing("j")) j <- attr(x, "index")
 
+    if (is.numeric(i)) i <- names(x)[i]
+    if (is.numeric(j)) j <- attr(x, "index")[j]
+
     L <- attr(x, "L")
 
     x <- unclass(x)
