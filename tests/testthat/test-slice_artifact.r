@@ -23,6 +23,18 @@ generate_keyed_slice <- function(type = c("date", "datetime")) {
     return(out)
 }
 
+test_that("names.slice_artifact", {
+    simple_date <- generate_simple_slice()
+
+    expect_equal(names(simple_date), c("X1", "Y"))
+
+    novos <- letters[1:2]
+    names(simple_date) <- novos
+
+    expect_equal(names(simple_date), novos)
+    expect_equal(names(attr(simple_date, "L")), novos)
+})
+
 test_that("dim.slice_artifact", {
     simple_date <- generate_simple_slice("date")
     expect_equal(dim(simple_date), c(2, 20))

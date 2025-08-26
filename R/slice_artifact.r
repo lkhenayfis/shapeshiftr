@@ -47,6 +47,33 @@ as.slice_artifact.data.frame <- function(x, index_column, ...) {
 
 # METHODS ------------------------------------------------------------------------------------------
 
+#' Get And Set Names Of `slice_artifact` Object
+#' 
+#' Functions for getting names of variables and renaming them in an `slice_artifact` object
+#' 
+#' @name names_slice_artifact
+NULL
+
+#' @rdname names_slice_artifact
+#' 
+#' @export 
+
+names.slice_artifact <- function(x) {
+    names(unclass(x))
+}
+
+#' @rdname names_slice_artifact
+#' 
+#' @export 
+
+`names<-.slice_artifact` <- function(x, value) {
+    x <- unclass(x)
+    L <- attr(x, "L")
+    names(x) <- value
+    names(L) <- value
+    new_slice_artifact(x, attr(x, "index"), L)
+}
+
 #' Get Dimensions Of \code{slice_artifact} Objects
 #' 
 #' Returns a vector with number of features and time indexes, in this order
