@@ -51,18 +51,29 @@ test_that("guess_sample_freq", {
 
 test_that("parse_laglead_times", {
 
-    L_list <- list(seq(-5, -2), seq(1, 3), 4)
-    L <- parse_laglead_times(simple_dt_date, "date", L_list, letters[1:3])
-    expect_equal(L, L_list)
+    vars <- letters[1:3]
 
-    L <- parse_laglead_times(simple_dt_datetime, "datetime", L_list, letters[1:3])
-    expect_equal(L, lapply(L_list, "*", 3600))
+    L_list_nameless <- list(seq(-5, -2), seq(1, 3), 4)
+    L <- parse_laglead_times(simple_dt_date, "date", L_list_nameless, vars)
+    expect_equal(names(L), vars)
+    expect_equal(unname(L), L_list_nameless)
 
-    expect_error(parse_laglead_times(simple_dt_date, "date", L_list, letters[1:2]))
+    L_list <- list("b" = seq(1, 3), "a" = seq(-5, -2), "c" = 4)
+    L <- parse_laglead_times(simple_dt_date, "date", L_list, vars)
+    expect_equal(names(L), vars)
+    expect_equal(unname(L), L_list_nameless)
+
+    L <- parse_laglead_times(simple_dt_datetime, "datetime", L_list, vars)
+    expect_equal(unname(L), lapply(L_list_nameless, "*", 3600))
+
+    # lista L de tamanho diferente de variables
+    expect_error(parse_laglead_times(simple_dt_date, "date", L_list, vars[1:2]))
+
+    # L como inteiro sendo expandido para lista
 
     L_int <- 2
-    L <- parse_laglead_times(simple_dt_datetime, "datetime", L_int, letters[1:3])
-    expect_equal(L, lapply(seq_len(3), function(i) L_int * 3600))
+    L <- parse_laglead_times(simple_dt_datetime, "datetime", L_int, vars)
+    expect_equal(L, list(a = 7200, b = 7200, c = 7200))
 })
 
 test_that("parse_start_time", {

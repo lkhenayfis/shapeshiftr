@@ -82,6 +82,8 @@ parse_laglead_times <- function(data, slice_on, L, variables) {
 
     L <- lapply(L, function(l) l * as.numeric(sample_freq))
 
+    if (is.null(names(L))) names(L) <- variables else L <- L[variables]
+
     return(L)
 }
 
