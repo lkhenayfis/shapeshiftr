@@ -1,3 +1,18 @@
+# master
+
+## New features
+
+* Subsetting of `slice_artifacts` can now be done by integer positions, on top of by variable name
+  of index string
+* Adds `names` and `names<-` methods for `slice_artifact` objects
+
+## Misc
+
+* Attribute `L` now has names of variables in the slice
+* Method `merge.slice_artifact` and function `combine_features` now keep attribute `L` pertaining 
+  to existing variables, from original `slice_artifact` instead of `NA`
+* Method `[.slice_artifact` now keeps `L` only on subsetted variables
+
 # shapeshiftr 0.2
 
 ## Misc
