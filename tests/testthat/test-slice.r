@@ -59,7 +59,7 @@ test_that("do_single_slice - Date", {
     slice <- do_single_slice(simple_dt_date, center, params)
 
     expect_true(inherits(slice, "slice_artifact"))
-    expect_equal(attr(slice, "L"), params$L)
+    expect_equal(attr(slice, "L"), structure(params$L, names = params$names))
     expect_equal(attr(slice, "index"), center)
     expect_equal(names(slice), params$names)
 
@@ -70,7 +70,7 @@ test_that("do_single_slice - Date", {
     slice <- do_single_slice(simple_dt_date, center, params)
 
     expect_true(inherits(slice, "slice_artifact"))
-    expect_equal(attr(slice, "L"), params$L)
+    expect_equal(attr(slice, "L"), structure(params$L, names = params$names))
     expect_equal(attr(slice, "index"), center)
     expect_equal(names(slice), params$names)
 
@@ -81,7 +81,7 @@ test_that("do_single_slice - Date", {
     slice <- do_single_slice(simple_dt_date, center, params)
 
     expect_true(inherits(slice, "slice_artifact"))
-    expect_equal(attr(slice, "L"), params$L)
+    expect_equal(attr(slice, "L"), structure(params$L, names = params$names))
     expect_equal(attr(slice, "index"), center)
     expect_equal(names(slice), params$names)
 
@@ -96,7 +96,7 @@ test_that("do_single_slice - Date", {
     slice <- do_single_slice(keyed_dt_date, center, params)
 
     expect_true(inherits(slice, "slice_artifact"))
-    expect_equal(attr(slice, "L"), params$L)
+    expect_equal(attr(slice, "L"), structure(params$L, names = params$names))
     expect_equal(attr(slice, "index"), center)
     expect_equal(names(slice), params$names)
 
@@ -107,7 +107,7 @@ test_that("do_single_slice - Date", {
     slice <- do_single_slice(keyed_dt_date[1:97], center, params)
 
     expect_true(inherits(slice, "slice_artifact"))
-    expect_equal(attr(slice, "L"), params$L)
+    expect_equal(attr(slice, "L"), structure(params$L, names = params$names))
     expect_equal(attr(slice, "index"), center)
     expect_equal(names(slice), params$names)
 
@@ -118,7 +118,7 @@ test_that("do_single_slice - Date", {
     slice <- do_single_slice(keyed_dt_date, center, params)
 
     expect_true(inherits(slice, "slice_artifact"))
-    expect_equal(attr(slice, "L"), params$L)
+    expect_equal(attr(slice, "L"), structure(params$L, names = params$names))
     expect_equal(attr(slice, "index"), center)
     expect_equal(names(slice), params$names)
 
@@ -136,7 +136,7 @@ test_that("do_single_slice - POSIX", {
     slice <- do_single_slice(simple_dt_datetime, center, params)
 
     expect_true(inherits(slice, "slice_artifact"))
-    expect_equal(attr(slice, "L"), params$L)
+    expect_equal(attr(slice, "L"), structure(params$L, names = params$names))
     expect_equal(attr(slice, "index"), center)
     expect_equal(names(slice), params$names)
 
@@ -147,7 +147,7 @@ test_that("do_single_slice - POSIX", {
     slice <- do_single_slice(simple_dt_datetime, center, params)
 
     expect_true(inherits(slice, "slice_artifact"))
-    expect_equal(attr(slice, "L"), params$L)
+    expect_equal(attr(slice, "L"), structure(params$L, names = params$names))
     expect_equal(attr(slice, "index"), center)
     expect_equal(names(slice), params$names)
 
@@ -158,7 +158,7 @@ test_that("do_single_slice - POSIX", {
     slice <- do_single_slice(simple_dt_datetime, center, params)
 
     expect_true(inherits(slice, "slice_artifact"))
-    expect_equal(attr(slice, "L"), params$L)
+    expect_equal(attr(slice, "L"), structure(params$L, names = params$names))
     expect_equal(attr(slice, "index"), center)
     expect_equal(names(slice), params$names)
 
@@ -173,7 +173,7 @@ test_that("do_single_slice - POSIX", {
     slice <- do_single_slice(keyed_dt_datetime, center, params)
 
     expect_true(inherits(slice, "slice_artifact"))
-    expect_equal(attr(slice, "L"), params$L)
+    expect_equal(attr(slice, "L"), structure(params$L, names = params$names))
     expect_equal(attr(slice, "index"), center)
     expect_equal(names(slice), params$names)
 
@@ -184,7 +184,7 @@ test_that("do_single_slice - POSIX", {
     slice <- do_single_slice(keyed_dt_datetime[1:97], center, params)
 
     expect_true(inherits(slice, "slice_artifact"))
-    expect_equal(attr(slice, "L"), params$L)
+    expect_equal(attr(slice, "L"), structure(params$L, names = params$names))
     expect_equal(attr(slice, "index"), center)
     expect_equal(names(slice), params$names)
 
@@ -195,7 +195,7 @@ test_that("do_single_slice - POSIX", {
     slice <- do_single_slice(keyed_dt_datetime[1:97], center, params)
 
     expect_true(inherits(slice, "slice_artifact"))
-    expect_equal(attr(slice, "L"), params$L)
+    expect_equal(attr(slice, "L"), structure(params$L, names = params$names))
     expect_equal(attr(slice, "index"), center)
     expect_equal(names(slice), params$names)
 

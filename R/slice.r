@@ -30,10 +30,9 @@
 #' 
 #' Lag and lead times, passed through argument \code{L}, are differentiated by their sign. Negative
 #' values are interpreted as lags and positive ones as leads. The canonical way to pass this
-#' argument is as list indicating lags/leads for each variable, in the same order as
-#' \code{variables}. If unamed, it is assumed \code{L} is in the same order as \code{variables}.
-#' If \code{L} is a single integer or vector of integers, it is assumed all variables should be
-#' sliced equally.
+#' argument is a names list indicating lags/leads for each variable. If unamed, it is assumed
+#' \code{L} is in the same order as \code{variables}. If \code{L} is a single integer or vector of
+#' integers, it is assumed all variables should be sliced equally.
 #' 
 #' @param data the data.frame-like object on which to operate
 #' @param variables names of variables for extraction in slicing
@@ -86,9 +85,10 @@ do_single_slice.simple_slice_params <- function(data, index, params) {
         list(data[rows][[v]])
     }, SIMPLIFY = FALSE)
 
-    names(slice) <- params$names
+    new <- new_slice_artifact(slice, index, params$L)
+    names(new) <- params$names
 
-    new_slice_artifact(slice, index, params$L)
+    return(new)
 }
 
 do_single_slice.keyed_slice_params <- function(data, index, params) {
