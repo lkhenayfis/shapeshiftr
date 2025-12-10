@@ -1,4 +1,11 @@
-# master
+# pipes
+
+## New features
+
+* Adiciona funcionalidade de `pipes` ao pacote para automatizacao de manipulacoes de dados na
+  geracao de regressores
+
+# shapeshiftr 0.3
 
 ## New features
 
