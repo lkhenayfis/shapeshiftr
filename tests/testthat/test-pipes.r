@@ -181,3 +181,19 @@ test_that("eval_pipes", {
         expect_equal(round(eval_pipe[[2]][1]), c(mpg = 27))
     })
 })
+
+test_that("combine_pipes", {
+    f <- combine_pipes
+    expect_true(is.function(f))
+
+    test_that("caso de uso padrao", {
+        parsed_pipes <- parse_pipes(raw_pipes)
+        eval_pipe    <- eval_pipes(parsed_pipes)
+
+        cfun <- function(x, y, ...) rbind(x, y)
+        combined <- combine_pipes(eval_pipe, cfun)
+
+        expect_true(inherits(combined, "matrix"))
+        expect_equal(dim(combined), c(7, 11))
+    })
+})

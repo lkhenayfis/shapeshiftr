@@ -138,3 +138,30 @@ eval_single_pipe <- function(pipe, env = parent.frame(), enclos = parent.frame()
 eval_pipes <- function(pipes, env = parent.frame(), enclos = parent.frame()) {
     lapply(pipes, eval_single_pipe, env = env, enclos = enclos)
 }
+
+#' Combinacao De Resultados De Pipes
+#' 
+#' Combina saidas de pipes resultantes de uma chamada de `eval_pipes`
+#' 
+#' Essencialmente esta funcao e um wrapper de `Reduce` aplicado a `evals` com a funcao
+#' `combine_fun`. Em funcao disto, `combine_fun` deve ser uma funcao de minimamente dois argumentos
+#' `x` e `y`, bem como o argumento variatico `...` para consistencia entre chamadas. Demais
+#' argumentos opcionais sao permitidos e serao repassados para `combine_fun`.
+#' 
+#' `default_combine` e apenas uma chamada de `merge` utilizando `by = 1`, isto e, merge de todos
+#' os dados em `evals` pela primeira coluna de cada um deles.
+#' 
+#' @param evals lista de elementos a serem combinados, tipicamente o resultado de `eval_pipes`
+#' @param combine_fun funcao de combinacao a ser aplicada, por default `default_combine`. Veja
+#'     Detalhes
+#' @param ... argumentos adicionais a serem passados para `combine_fun`
+#' 
+#' @return resultado da combinacao
+
+combine_pipes <- function(evals, combine_fun = default_combine, ...) {
+    Reduce(function(x, y) combine_fun(x, y, ...), evals)
+}
+
+default_combine <- function(x, y, ...) {
+    merge(x, y, by = 1)
+}
