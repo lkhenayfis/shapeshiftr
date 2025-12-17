@@ -4,7 +4,7 @@
 \alias{eval_single_pipe}
 \title{Avalia Um Unico Pipe}
 \usage{
-eval_single_pipe(pipe, env, enclos = parent.frame())
+eval_single_pipe(pipe, env = parent.frame(), enclos = parent.frame())
 }
 \arguments{
 \item{pipe}{um pipe parsed por \code{parse_single_pipe}}

@@ -4,10 +4,14 @@
 \alias{parse_pipes}
 \title{Parse Lista De Pipes}
 \usage{
-parse_pipes(raw_pipes)
+parse_pipes(raw_pipes, env = parent.frame(), enclos = parent.frame())
 }
 \arguments{
 \item{raw_pipes}{lista definindo diversos pipes}
+
+\item{env}{ambiente onde o pipe sera avaliado}
+
+\item{enclos}{ambiente de encerramento para avaliacao das closures}
 }
 \value{
 lista \code{raw_pipes} com elementos \code{"transforms"} de cada pipe avaliados

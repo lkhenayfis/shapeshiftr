@@ -62,12 +62,12 @@ parse_single_pipe <- function(raw_pipe, env = parent.frame(), enclos = parent.fr
     raw_pipe$transforms[[1]] <- eval(as.call(cc), env, enclos)
 
     if (length(l_t) >= 2) {
-        x <- do.call(raw_pipe$transforms[[1]], args, envir = env)
+        x <- eval(as.call(c(list(raw_pipe$transforms[[1]]), args)), env, enclos)
         for (i in seq_along(l_t)[-1]) {
             cc <- c(l_t[[i]], list(x = x))
             cc[[1]] <- str2lang(cc[[1]])
             raw_pipe$transforms[[i]] <- eval(as.call(cc), env, enclos)
-            x <- do.call(raw_pipe$transforms[[i]], list(x = x))
+            x <- eval(as.call(c(list(raw_pipe$transforms[[i]]), list(x = x))), env, enclos)
         }
     }
 
@@ -79,11 +79,13 @@ parse_single_pipe <- function(raw_pipe, env = parent.frame(), enclos = parent.fr
 #' Wrapper simples para loop de `parse_single_pipe` em multiplos pipes
 #' 
 #' @param raw_pipes lista definindo diversos pipes
+#' @param env ambiente onde o pipe sera avaliado
+#' @param enclos ambiente de encerramento para avaliacao das closures
 #' 
 #' @return lista `raw_pipes` com elementos `"transforms"` de cada pipe avaliados
 
-parse_pipes <- function(raw_pipes) {
-    lapply(raw_pipes, parse_single_pipe)
+parse_pipes <- function(raw_pipes, env = parent.frame(), enclos = parent.frame()) {
+    lapply(raw_pipes, parse_single_pipe, env = env, enclos = enclos)
 }
 
 # EVAL DE PIPES ------------------------------------------------------------------------------------
@@ -128,10 +130,11 @@ eval_single_pipe <- function(pipe, env = parent.frame(), enclos = parent.frame()
 #' Wrapper simples para loop de `eval_single_pipe` em multiplos pipes
 #' 
 #' @param pipes lista de pipes ja parsed por `parse_pipes`
+#' @param env ambiente onde o pipe sera avaliado
+#' @param enclos ambiente de encerramento para avaliacao das closures
 #' 
 #' @return data.table unico combinando os resultados da aplicacao de todos os pipes em `pipes`
 
-eval_pipes <- function(pipes) {
-    evals <- lapply(pipes, eval_single_pipe)
-    Reduce(function(x, y) merge(x, y, by.x = names(x)[1], by.y = names(y)[1]), evals)
+eval_pipes <- function(pipes, env = parent.frame(), enclos = parent.frame()) {
+    lapply(pipes, eval_single_pipe, env = env, enclos = enclos)
 }

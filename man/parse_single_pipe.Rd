@@ -4,7 +4,7 @@
 \alias{parse_single_pipe}
 \title{Parse Um Unico Pipe}
 \usage{
-parse_single_pipe(raw_pipe, env, enclos = parent.frame())
+parse_single_pipe(raw_pipe, env = parent.frame(), enclos = parent.frame())
 }
 \arguments{
 \item{raw_pipe}{uma lista definindo pipe singular, isto e, com elemento \code{"on"} e \code{"transforms"}}
@@ -23,4 +23,42 @@ Interpreta a definicao de um unico pipe, gerando as closures definidas
 Ambos \code{env} e \code{enclos} funcionam tal qual como em \code{eval}, permitindo que \code{env} corresponda a uma
 lista nomeada ou data.frame, e \code{enclos} seja um ambiente onde funcoes auxiliares podem ser
 definidas
+
+\code{raw_pipe} deve ser uma lista nomeada de dois argumentos: \code{"on"} e \verb{"transforms}. \code{"on"} e
+simplesmente um vetor de no maximo dois elementos indicando os nomes das variaveis nas quais
+a(s) transformacao(oes) opera(m). \code{"transforms"} deve ser uma lista de especificacoes das
+transformacoes. Cada transformacao e por sua vez uma lista de ao menos um elemento nomeado,
+\code{"fun"}, uma string indicando o nome da geradora de closure a ser chamada. Alem de \code{"fun"} outros
+elementos podem existir indicando parametrizacao da geradora de closure. Veja \code{Exemplos} para
+uma ilustracao de pipe bruto.
+
+Note que as funcoes nas definicoes de transformacao devem sempre ser geradoras de closures e
+necessariamente precisam incluir o arumento variatico \code{...}. Isto e necessario porque, numa etapa
+posterior, estas geradoras serao interpretadas para entao produzir o pipe parsed no qual
+\code{transforms} sao, de fato, funcoes a serem chamadas no dado.
+}
+\examples{
+
+# geradora de uma closure de unico argumento `x` que chama filtra este argumento com base em
+# outros parametros especificados
+gen_closure_filter <- function(by, value, ...) function(x) x[x[[by]] == value, ]
+
+# geradora de uma closure de unico argumento `x` que chama `summary` neste argumento
+gen_closure_summary <- function(...) function(x) summary(x)
+
+raw_pipe <- list(
+    on = "mtcars",
+    transforms = list(
+        list(
+            fun = "gen_closure_filter",
+            by = "cyl", value = 6
+        ),
+        list(
+            fun = "gen_closure_summary"
+        )
+    )
+)
+
+parsed_pipe <- parse_single_pipe(raw_pipe)
+
 }
