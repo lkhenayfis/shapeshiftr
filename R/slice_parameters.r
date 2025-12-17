@@ -62,6 +62,17 @@ guess_sample_freq <- function(data, column) {
         "POSIXct" = "secs")
 
     freq <- as.numeric(freq, units = unit)
+
+    if (time_type == "Date") {
+        if (freq >= 28 && freq <= 31) {
+            unit <- "months"
+            freq <- 1
+        } else if (freq >= 365 && freq <= 366) {
+            unit <- "years"
+            freq <- 1
+        }
+    }
+
     attr(freq, "unit") <- unit
 
     return(freq)

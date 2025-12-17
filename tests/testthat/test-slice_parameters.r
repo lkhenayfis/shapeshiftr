@@ -39,14 +39,45 @@ test_that("parse_variables", {
 })
 
 test_that("guess_sample_freq", {
+    # Daily data
     sf <- guess_sample_freq(simple_dt_date, "date")
     expect_equal(sf, structure(1, unit = "days"))
 
+    # Hourly data
     sf <- guess_sample_freq(simple_dt_datetime, "datetime")
     expect_equal(sf, structure(3600, unit = "secs"))
 
+    # Half-hourly data
     sf <- guess_sample_freq(keyed_dt_datetime, "target_datetime")
     expect_equal(sf, structure(1800, unit = "secs"))
+
+    # Monthly data
+    monthly_data <- data.frame(
+        date = seq(as.Date("2020-01-01"), as.Date("2020-12-01"), by = "1 month")
+    )
+    sf <- guess_sample_freq(monthly_data, "date")
+    expect_equal(sf, structure(1, unit = "months"))
+
+    # Monthly data with varying lengths (28-31 days)
+    monthly_data_2 <- data.frame(
+        date = as.Date(c("2020-01-15", "2020-02-15", "2020-03-15", "2020-04-15"))
+    )
+    sf <- guess_sample_freq(monthly_data_2, "date")
+    expect_equal(sf, structure(1, unit = "months"))
+
+    # Yearly data
+    yearly_data <- data.frame(
+        date = seq(as.Date("2015-06-01"), as.Date("2020-06-01"), by = "1 year")
+    )
+    sf <- guess_sample_freq(yearly_data, "date")
+    expect_equal(sf, structure(1, unit = "years"))
+
+    # Yearly data including leap year
+    yearly_data_leap <- data.frame(
+        date = as.Date(c("2019-01-01", "2020-01-01", "2021-01-01"))
+    )
+    sf <- guess_sample_freq(yearly_data_leap, "date")
+    expect_equal(sf, structure(1, unit = "years"))
 })
 
 test_that("parse_laglead_times", {
