@@ -2,6 +2,8 @@ gen_closure_filter <- function(by, value, ...) function(x) x[x[[by]] == value, ]
 gen_closure_summary <- function(...) function(x) summary(x)
 gen_closure_colMeans <- function(...) function(x) colMeans(x)
 
+env <- environment(gen_closure_filter)
+
 raw_pipes <- list(
     list(
         on = "mtcars",
@@ -59,7 +61,7 @@ test_that("parse_single_pipe", {
 
     test_that("env e uma lista/data.frame", {
 
-        parsed_pipe <- f(raw_pipes[[1]], env = data_list, enclos = parent.frame())
+        parsed_pipe <- f(raw_pipes[[1]], env = data_list, enclos = env)
 
         expect_true(inherits(parsed_pipe, "list"))
         expect_equal(length(parsed_pipe), 2)
@@ -109,7 +111,7 @@ test_that("parse_pipes", {
 
     test_that("env e uma lista/data.frame", {
 
-        parsed_pipes <- f(raw_pipes, env = data_list, enclos = parent.frame())
+        parsed_pipes <- f(raw_pipes, env = data_list, enclos = env)
 
         expect_true(inherits(parsed_pipes, "list"))
         expect_equal(length(parsed_pipes), 2)
@@ -143,9 +145,9 @@ test_that("eval_single_pipe", {
     test_that("env e uma lista/data.frame", {
         data_list <- list(mtcars = mtcars)
 
-        parsed_pipe <- parse_single_pipe(raw_pipes[[1]], env = data_list, enclos = parent.frame())
+        parsed_pipe <- parse_single_pipe(raw_pipes[[1]], env = data_list, enclos = env)
 
-        eval_pipe <- f(parsed_pipe, env = data_list, enclos = parent.frame())
+        eval_pipe <- f(parsed_pipe, env = data_list, enclos = env)
 
         expect_true(inherits(eval_pipe, "table"))
         expect_equal(eval_pipe[1, 1], "Min.   :17.80  ")
@@ -172,8 +174,8 @@ test_that("eval_pipes", {
     test_that("env e uma lista/list", {
         data_list <- list(mtcars = mtcars)
 
-        parsed_pipes <- parse_pipes(raw_pipes, env = data_list, enclos = parent.frame())
-        eval_pipe <- f(parsed_pipes, env = data_list, enclos = parent.frame())
+        parsed_pipes <- parse_pipes(raw_pipes, env = data_list, enclos = env)
+        eval_pipe <- f(parsed_pipes, env = data_list, enclos = env)
 
         expect_true(inherits(eval_pipe, "list"))
         expect_equal(length(eval_pipe), 2)

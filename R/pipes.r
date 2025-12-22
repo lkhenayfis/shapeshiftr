@@ -47,7 +47,7 @@
 #'     )
 #' )
 #' 
-#' parsed_pipe <- parse_single_pipe(raw_pipe)
+#' parsed_pipe <- shapeshiftr:::parse_single_pipe(raw_pipe)
 #' 
 #' @return lista `raw_pipe` com elemento `"transforms"` avaliado para as closures definidas
 

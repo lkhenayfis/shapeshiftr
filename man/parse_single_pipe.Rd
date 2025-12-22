@@ -59,6 +59,6 @@ raw_pipe <- list(
     )
 )
 
-parsed_pipe <- parse_single_pipe(raw_pipe)
+parsed_pipe <- shapeshiftr:::parse_single_pipe(raw_pipe)
 
 }
