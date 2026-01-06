@@ -50,6 +50,8 @@
 #' parsed_pipe <- shapeshiftr:::parse_single_pipe(raw_pipe)
 #' 
 #' @return lista `raw_pipe` com elemento `"transforms"` avaliado para as closures definidas
+#' 
+#' @export
 
 parse_single_pipe <- function(raw_pipe, env = parent.frame(), enclos = parent.frame()) {
     args <- lapply(raw_pipe$on, str2lang)
@@ -83,6 +85,8 @@ parse_single_pipe <- function(raw_pipe, env = parent.frame(), enclos = parent.fr
 #' @param enclos ambiente de encerramento para avaliacao das closures
 #' 
 #' @return lista `raw_pipes` com elementos `"transforms"` de cada pipe avaliados
+#' 
+#' @export
 
 parse_pipes <- function(raw_pipes, env = parent.frame(), enclos = parent.frame()) {
     lapply(raw_pipes, parse_single_pipe, env = env, enclos = enclos)
@@ -103,6 +107,8 @@ parse_pipes <- function(raw_pipes, env = parent.frame(), enclos = parent.frame()
 #' @param enclos ambiente de encerramento para avaliacao das closures
 #' 
 #' @return resultado da aplicacao das closures em `transforms` ao(s) dado(s) em `"on"`
+#' 
+#' @export
 
 eval_single_pipe <- function(pipe, env = parent.frame(), enclos = parent.frame()) {
 
@@ -134,6 +140,8 @@ eval_single_pipe <- function(pipe, env = parent.frame(), enclos = parent.frame()
 #' @param enclos ambiente de encerramento para avaliacao das closures
 #' 
 #' @return data.table unico combinando os resultados da aplicacao de todos os pipes em `pipes`
+#' 
+#' @export
 
 eval_pipes <- function(pipes, env = parent.frame(), enclos = parent.frame()) {
     lapply(pipes, eval_single_pipe, env = env, enclos = enclos)
@@ -157,6 +165,8 @@ eval_pipes <- function(pipes, env = parent.frame(), enclos = parent.frame()) {
 #' @param ... argumentos adicionais a serem passados para `combine_fun`
 #' 
 #' @return resultado da combinacao
+#' 
+#' @export
 
 combine_pipes <- function(evals, combine_fun = default_combine, ...) {
     Reduce(function(x, y) combine_fun(x, y, ...), evals)
