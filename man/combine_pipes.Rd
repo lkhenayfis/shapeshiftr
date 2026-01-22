@@ -21,6 +21,25 @@ result of the combination
 Combines outputs from pipes resulting from a call to \code{eval_pipes}
 }
 \details{
+\subsection{Default Merge Behavior}{
+
+By default, \code{combine_pipes} applies transformations sequentially,
+merging results by the first column. This creates a composite transformation
+equivalent to function composition: \code{f3(f2(f1(x)))}.
+}
+
+\subsection{Custom Combination}{
+
+Provide \code{combine_fun} parameter to control how pipe outputs are merged:
+\itemize{
+\item \strong{Sequential}: Default behavior (function composition)
+\item \strong{Parallel}: Apply pipes independently and cbind/rbind results
+\item \strong{Custom logic}: Any merging strategy via custom function
+}
+
+The \code{combine_fun} should accept two arguments (outputs of consecutive pipes)
+and return a combined result.
+
 Essentially this function is a wrapper of \code{Reduce} applied to \code{evals} with the function
 \code{combine_fun}. Because of this, \code{combine_fun} should be a function with at least two arguments
 \code{x} and \code{y}, as well as the variadic argument \code{...} for consistency between calls. Other
@@ -28,4 +47,77 @@ optional arguments are permitted and will be passed to \code{combine_fun}.
 
 \code{default_combine} is merely a call to \code{merge} using \code{by = 1}, that is, merging all
 data in \code{evals} by the first column of each one.
+}
+}
+\examples{
+# Example 1: Default merge for sequential transformations ----
+# Chain multiple transformations using built-in merge
+
+library(data.table)
+data(simple_dt_date)
+
+# Define transformation generators
+gen_log_transform <- function(...) {
+    function(x) log(abs(x) + 1)
+}
+
+gen_standardize <- function(...) {
+    train_data <- list(...)[[1]]
+    train_mean <- mean(train_data, na.rm = TRUE)
+    train_sd <- sd(train_data, na.rm = TRUE)
+    function(x) (x - train_mean) / train_sd
+}
+
+# Create raw pipes
+raw_pipes <- list(
+    list(
+        on = "simple_dt_date$X1",
+        transforms = list(list(fun = "gen_log_transform"))
+    ),
+    list(
+        on = "simple_dt_date$X2",
+        transforms = list(list(fun = "gen_standardize"))
+    )
+)
+
+# Parse pipes
+parsed <- parse_pipes(raw_pipes)
+
+# Evaluate pipes
+evals <- eval_pipes(parsed)
+
+# Combine with default merge
+combined <- combine_pipes(evals)
+
+print(head(combined))
+
+# Default merge creates data.table with results merged by index
+
+# Example 2: Custom combine function for flexible composition ----
+# Provide custom function to control how pipes are combined
+
+# Custom combine: cbind results with custom names
+custom_combine <- function(x, y, ...) {
+    if (is.numeric(x) && is.numeric(y)) {
+        data.table(transformed_1 = x, transformed_2 = y)
+    } else {
+        cbind(x, y)
+    }
+}
+
+combined_custom <- combine_pipes(evals, combine_fun = custom_combine)
+
+print(head(combined_custom))
+
+# Custom combine enables:
+# - Parallel transformations
+# - Feature concatenation
+# - Complex composition patterns
+
+}
+\seealso{
+\itemize{
+\item \code{\link{eval_pipes}} for creating evaluation results to combine
+\item \code{\link{parse_pipes}} for creating multiple pipes
+}
 }

@@ -19,3 +19,6 @@ list \code{raw_pipes} with elements \code{"transforms"} of each pipe evaluated
 \description{
 Simple wrapper for looping \code{parse_single_pipe} over multiple pipes
 }
+\seealso{
+\code{\link{parse_single_pipe}} for details on closure generators and pipe structure
+}

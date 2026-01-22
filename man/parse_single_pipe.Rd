@@ -7,7 +7,8 @@
 parse_single_pipe(raw_pipe, env = parent.frame(), enclos = parent.frame())
 }
 \arguments{
-\item{raw_pipe}{a list defining a singular pipe, that is, with element \code{"on"} and \code{"transforms"}}
+\item{raw_pipe}{a list defining a singular pipe, that is, with element \code{"on"} and \code{"transforms"}.
+See Details}
 
 \item{env}{environment where the raw pipes will be evaluated}
 
@@ -21,42 +22,224 @@ Interprets the definition of a single pipe, generating the defined closures
 }
 \details{
 Both \code{env} and \code{enclos} function just as in \code{eval}, allowing \code{env} to correspond to a named
-list or data.frame, and \code{enclos} to be an environment where helper functions can be defined
+list or data.frame, and \code{enclos} to be an environment where helper functions can be defined. The
+function mainly works by evaluating a function specified in \code{raw_pipe} in the context of \code{env}
+and \code{enclos}. The following subsections provide in-depth details.
+\subsection{Closure Generator Specification}{
 
-\code{raw_pipe} should be a named list with two arguments: \code{"on"} and \code{"transforms"}. \code{"on"} is
-simply a vector of at most two elements indicating the names of the variables on which
-the transformation(s) operate(s). \code{"transforms"} should be a list of transformation specifications.
-Each transformation is in turn a list with at least one named element, \code{"fun"}, a string indicating
-the name of the closure generator to be called. In addition to \code{"fun"}, other elements may exist
-indicating parameterization of the closure generator. See \code{Examples} for an illustration of a raw pipe.
+A closure generator is a function that returns a function. The returned function
+(the closure) "closes over" variables from its enclosing environment, capturing
+them for later use.
 
-Note that functions in transformation definitions must always be closure generators and must
-necessarily include the variadic argument \code{...}. This is necessary because, at a later stage,
-these generators will be interpreted to then produce the parsed pipe in which \code{transforms} are,
-in fact, functions to be called on the data.
+The generator can accept any number of parameters but must always include a variadic argument
+\code{...}. This is necessary to ensure a consistent interface among generators.
+
+The closure itself should only ever have a single argument \code{x} and rely on
+the generator to capture any necessary parameters, either passed as arguments to the generator or
+computed from data passed to the generator. The closure's only goal is to apply a transformation
+on \code{x} using the parameters captured from the generator's environment.
+
+An illustrative example is shown below with hypothetical function \code{transform}. Notice that
+\code{params} is computed from \code{data} once, by the generator, and then encapsulated in the closure for
+later use. This "later use" will be explained in the subsection \strong{Parsing Process}.
+
+\preformatted{
+my_generator <- function(data, ...) {
+  params <- compute_params(data)
+  
+  # Return closure that captures params
+  function(x) {
+    transform(x, params)
+  }
+}
+}
+
+So, basically, generators are a means of creating wrappers of other functions for
+pre-parametrized use later.
+}
+
+\subsection{Raw Pipe Structure}{
+
+\code{raw_pipe} should be a named list with two arguments: \code{"on"} and \code{"transforms"}.
+
+\code{"on"} is simply a vector of at most two elements indicating the names of the variables on which
+the transformation(s) operate(s).
+
+\code{"transforms"} should be a list of transformation specifications. Each transformation is in turn
+a list with at least one named element, \code{"fun"}, a string indicating the name of a function which
+\strong{must be} a closure generator. In addition to \code{"fun"}, other elements may exist corresponding
+to parameters of the generator. See the Examples for illustrations.
+
+\preformatted{
+my_raw_pipe <- list(
+    on = c("some_variable"),
+    transforms = list(
+        list(fun = "my_generator", data = my_data),
+    )
+)
+}
+
+The transform used in this illustrative example is the one from the previous subsection. Note
+the element \code{data} in the transform definition, which will be passed to the generator.
+\code{some_variable} and \code{my_data} are placeholders for actual data.
+}
+
+\subsection{Parsing Process}{
+
+The process of parsing a pipe is straightforward, based on building calls to the generator
+functions with the parameters defined in the transform specifications, and evaluating them in
+the context of \code{env} and \code{enclos}.
+
+There is one key step that happens "invisibly": when the call to the generator is built, the
+data defined in \code{"on"} is also passed as an argument \code{x} to the generator (which is why \code{...} is
+necessary). This serves two purposes:
+\enumerate{
+\item allows for "trainable" transformations, which will be discussed in the following subsection
+\item allows chaining of transforms
+}
+
+Using the previous illustrative example, the parsing process would build a call like
+
+\preformatted{
+my_generator(data = my_data, x = some_variable)
+}
+
+If there is only one transformation, this is evaluated and the resulting closure is stored. If
+there are more transformations, the resulting closure is immediately applied to \code{some_variable},
+and the resulting data is passed as \code{x} to the next generator in the list, and so on. This
+ensures that each transformation is applied in sequence, with each one receiving the output of
+the previous one as input.
+}
+
+\subsection{Stateless vs Trainable Transformations}{
+
+For the sake of clarity, transformations can be classified into two categories: stateless and
+trainable. This is entirely jargon and has no real bearing on the implementation. Stateless are
+the ones where the generator does not need to compute any parameters from data, either \code{x} or
+dedicated parameters, while trainable are the ones there such computations exist.
+}
+
+\subsection{Performance Considerations}{
+
+The characterisct of closures to keep their binding environment allows for their use as intended
+here but some caution must be exercised. Closures can capture large objects in their environment
+and, if these are not needed later, this can lead to unnecessary memory consumption. Thus, it is
+advisable to ensure that only necessary data is captured in the closure environment, deleting
+anything else. See Examples for illustrations.
+}
 }
 \examples{
 
-# generator of a closure with single argument `x` that filters this argument based on
-# other specified parameters
-gen_closure_filter <- function(by, value, ...) function(x) x[x[[by]] == value, ]
+# Example 1: Simple closure generator without learned parameters --------------------------------
 
-# generator of a closure with single argument `x` that calls `summary` on this argument
-gen_closure_summary <- function(...) function(x) summary(x)
+library(data.table)
+data(simple_dt_date)
 
+# Define closure generator: get head of data
+gen_get_head <- function(n, ...) {
+    # Return closure
+    function(x) {
+        head(x, n)
+    }
+}
+
+# Define raw pipe structure
 raw_pipe <- list(
-    on = "mtcars",
+    on = "simple_dt_date",
     transforms = list(
-        list(
-            fun = "gen_closure_filter",
-            by = "cyl", value = 6
-        ),
-        list(
-            fun = "gen_closure_summary"
-        )
+        list(fun = "gen_get_head", n = 5)
     )
 )
 
-parsed_pipe <- shapeshiftr:::parse_single_pipe(raw_pipe)
+# Parse: creates closure (no training needed)
+parsed <- parse_single_pipe(raw_pipe)
+print(parsed$transforms[[1]](simple_dt_date))
 
+# Example 2: Stacking transformations -----------------------------------------------------------
+
+# Define another closure generator: summary
+gen_summary <- function(...) {
+   function(x) {
+      summary(x)
+  }
+}
+
+#' # Define raw pipe structure
+raw_pipe <- list(
+    on = "simple_dt_date",
+    transforms = list(
+        list(fun = "gen_get_head", n = 5),
+        list(fun = "gen_summary")
+    )
+)
+
+# Parse: creates closure (no training needed)
+parsed <- parse_single_pipe(raw_pipe)
+
+# Application of the stacked transformations is shown in `eval_single_pipe` examples
+
+# Example 3: Trainable transformation with parameter learning -----------------------------------
+
+# Define a trainable closure generator: standardization of selected columns
+# note the explicit argument `x`: it is not strictly necessary but clarifies intent
+gen_standardize <- function(cols, x, ...) {
+    train_means <- colMeans(x[, ..cols], na.rm = TRUE)
+    train_sds <- apply(x[, ..cols], 2, sd, na.rm = TRUE)
+
+    # train_means, train_sds and cols are captured in the closure
+    function(x) {
+        x_copy <- copy(x)  # avoid modifying original data
+        for (col in cols) {
+            x_copy[[col]] <- (x_copy[[col]] - train_means[col]) / train_sds[col]
+        }
+        return(x_copy)
+    }
+}
+
+raw_pipe <- list(
+   on = "simple_dt_date",
+  transforms = list(
+      list(fun = "gen_standardize", cols = c("X1", "X2", "Y"))
+  )
+)
+
+parsed <- parse_single_pipe(raw_pipe)
+print(parsed$transforms[[1]](simple_dt_date))
+
+# Example 4: Using environments to control scope ------------------------------------------------
+
+# so far all data and functions are available in the global environment, but this is not
+# necessarily going to happen in practice. The following example illustrates how to use
+# environments to control scope.
+
+# Create new environment functions
+env <- new.env()
+assign("gen_standardize_2", gen_standardize, envir = env)
+
+# create a named list of data
+data_list <- list(dt = simple_dt_date)
+
+raw_pipe <- list(
+   on = "dt",
+  transforms = list(
+      list(fun = "gen_standardize", cols = c("X1", "X2", "Y"))
+  )
+)
+
+# This is a preview of how the pipe framework is used to maintain consistency between training
+# and inference
+# By defining "on" as "dt", the data used in parsing and evaluation can be swapped easily
+# without changing the pipe structure.
+parsed <- parse_single_pipe(raw_pipe, env = data_list, enclos = env)
+
+# exactly the same as previous example
+print(parsed$transforms[[1]](data_list$dt))
+
+}
+\seealso{
+\itemize{
+\item \code{\link{eval_single_pipe}} for applying parsed closures to data
+\item \code{\link{parse_pipes}} for parsing multiple pipes
+\item \code{\link{combine_pipes}} for combining multiple parsed pipes
+}
 }

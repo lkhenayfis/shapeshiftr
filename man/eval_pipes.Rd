@@ -19,3 +19,9 @@ single data.table combining the results of applying all pipes in \code{pipes}
 \description{
 Simple wrapper for looping \code{eval_single_pipe} over multiple pipes
 }
+\seealso{
+\itemize{
+\item \code{\link{eval_single_pipe}} for details on parse-eval separation
+\item \code{\link{parse_pipes}} for creating multiple parsed pipes
+}
+}
