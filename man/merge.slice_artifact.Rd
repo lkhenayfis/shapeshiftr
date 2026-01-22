@@ -23,3 +23,69 @@ data, or different slicing parameters, into a unified artifact object. This will
 in all elements for merging and ONLY USE indexes which are common to all. There is no \code{all}
 argument like in data.frame merging.
 }
+\examples{
+# Example 1: Merging lag and lead features for multi-horizon forecasting ----
+# Combine historical predictors (lags) with future targets (leads)
+
+library(data.table)
+data(simple_dt_date)
+
+# Create lag features for predictors
+x_lags <- slice(
+    data = simple_dt_date,
+    variables = c("X1", "X2"),
+    walk_on = "date",
+    L = c(-1, -2, -3)
+)
+
+# Create lead features for target variable (forecast horizons)
+y_leads <- slice(
+    data = simple_dt_date,
+    variables = "Y",
+    walk_on = "date",
+    L = c(1, 3, 7)
+)
+
+# Merge lags and leads
+complete_features <- merge(x_lags, y_leads)
+
+print(complete_features)
+str(complete_features, max.level = 2)
+
+# Index matching ensures temporal alignment
+# Now have both predictors (past) and targets (future) for multi-horizon modeling
+
+# Example 2: Merging variables with different lag structures ----
+# Slice variables separately with different lag depths, then combine
+
+# Volatile variable: short lags
+x1_slice <- slice(
+    data = simple_dt_date,
+    variables = "X1",
+    walk_on = "date",
+    L = c(-1, -2)
+)
+
+# Slow-moving variable: deeper lags
+x2_slice <- slice(
+    data = simple_dt_date,
+    variables = "X2",
+    walk_on = "date",
+    L = c(-1, -3, -5, -7)
+)
+
+# Merge heterogeneous lag patterns
+merged <- merge(x1_slice, x2_slice)
+
+str(merged, max.level = 2)
+
+# Enables flexible feature engineering
+# Each variable can have lag structure matching its characteristics
+
+}
+\seealso{
+\itemize{
+\item \code{\link{slice}} for creating slice artifacts
+\item \code{\link{as.data.table.slice_artifact}} for converting merged artifacts to modeling format
+}
+}

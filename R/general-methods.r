@@ -3,11 +3,63 @@
 #' 
 #' Methods of [base], [utils] and [stats] generics for `slice_artifact` objects
 #' 
+#' @details
+#' ## INNER_METHOD_RUN Pattern
+#' 
+#' Statistical methods for \code{slice_artifact} use the \code{INNER_METHOD_RUN}
+#' pattern to apply operations to each lag component while preserving structure.
+#' 
+#' **Creating Custom Methods**:
+#' 
+#' You can extend the class with custom methods:
+#' 
+#' \preformatted{
+#' my_method.slice_artifact <- function(obj, variables, ...) {
+#'   INNER_METHOD_RUN(obj, variables, FUN = function(x) {
+#'     # Your custom logic here
+#'   }, ...)
+#' }
+#' }
+#' 
+#' The INNER_METHOD_RUN helper applies a function to each lag component
+#' across all variables, handling NA exclusion and preserving the
+#' slice_artifact structure.
+#' 
 #' @param x a `slice_artifact` object
 #' @param variables variables on which to compute function
 #' @param ... remaining arguments passed on to generic
 #' 
 #' @return `slice_artifact` with computed function on all slices of specified `variables`
+#' 
+#' @examples
+#' # Example: Statistical summaries and method extension ----
+#' # Apply statistical methods to slice_artifact
+#' 
+#' library(data.table)
+#' data(simple_dt_date)
+#' 
+#' # Create slice artifact
+#' slices <- slice(
+#'     data = simple_dt_date,
+#'     variables = c("X1", "Y"),
+#'     walk_on = "date",
+#'     L = c(-1, -2, -3)
+#' )
+#' 
+#' # Built-in statistical methods
+#' mean_slices <- mean(slices)
+#' sd_slices <- sd(slices)
+#' summary_slices <- summary(slices)
+#' 
+#' cat("Mean of slices:\n")
+#' str(mean_slices, max.level = 2)
+#' 
+#' cat("\nSD of slices:\n")
+#' str(sd_slices, max.level = 2)
+#' 
+#' # These methods use INNER_METHOD_RUN pattern
+#' # You can create custom methods following same pattern
+#' # For comprehensive examples of custom methods, see package documentation
 #' 
 #' @name general-methods
 NULL

@@ -6,6 +6,121 @@
 #' @param list a list of data.frame-like slices as extracted by \code{do_single_slice}
 #' @param index scalar of vector of time indexes corresponding to each slice
 #' @param L the list of lag/leads used in extracting slices
+#' 
+#' @section The slice_artifact Class:
+#' 
+#' ## Internal Structure
+#' 
+#' A \code{slice_artifact} is a list of lists with the following structure:
+#' 
+#' \itemize{
+#'     \item **Outer list**: Named by variable names from original data
+#'     \item **Inner lists**: Named by lag/lead values (e.g., "L-1", "L-2", "L1")
+#'     \item **Vectors**: Each inner element contains the sliced values for that lag
+#' }
+#' 
+#' For example, a slice of variable \code{Y} with lags -1, -2, -3:
+#' 
+#' \preformatted{
+#' List of 1
+#'  $ Y:List of 3
+#'   ..$ L-1: num [1:N] ...  # 1-period lag
+#'   ..$ L-2: num [1:N] ...  # 2-period lag
+#'   ..$ L-3: num [1:N] ...  # 3-period lag
+#' }
+#' 
+#' ## Attributes
+#' 
+#' Every \code{slice_artifact} has three attributes:
+#' 
+#' \describe{
+#'     \item{\code{index}}{Temporal index vector (Date or POSIXct) indicating the
+#'         reference times for each slice. Used for alignment in merging operations.}
+#'     \item{\code{L}}{List or vector specifying the lag/lead structure that was
+#'         requested in the \code{slice()} call. Retained for reference and validation.}
+#'     \item{\code{class}}{Character vector: \code{c("slice_artifact", "list")}.
+#'         Enables S3 method dispatch.}
+#' }
+#' 
+#' ## Available Methods
+#' 
+#' The following S3 methods are available for \code{slice_artifact} objects:
+#' 
+#' \tabular{ll}{
+#'     **Method** \tab **Purpose** \cr
+#'     \code{print} \tab Display summary of slice structure \cr
+#'     \code{summary} \tab Detailed statistical summary of slices \cr
+#'     \code{[} (subset) \tab Extract specific variables or lags \cr
+#'     \code{merge} \tab Combine multiple slice artifacts \cr
+#'     \code{as.data.table} \tab Convert to wide or long data.table format \cr
+#'     \code{dwt} \tab Apply discrete wavelet transform \cr
+#'     General methods \tab \code{mean}, \code{sd}, \code{var}, \code{quantile}, etc.
+#' }
+#' 
+#' See individual method documentation for details: \code{\link{merge.slice_artifact}},
+#' \code{\link{as.data.table.slice_artifact}}, \code{\link{dwt.slice_artifact}}.
+#' 
+#' ## Method Dispatch
+#' 
+#' The \code{slice_artifact} class uses R's S3 object system. When you call a
+#' generic function on a slice_artifact, R looks for a method with the pattern
+#' \code{generic.slice_artifact}:
+#' 
+#' \preformatted{
+#' obj <- slice(data, variables = "Y", walk_on = "date", L = -1:-3)
+#' 
+#' # Calls print.slice_artifact()
+#' print(obj)
+#' 
+#' # Calls summary.slice_artifact()
+#' summary(obj)
+#' 
+#' # Calls mean.slice_artifact()
+#' mean(obj)
+#' }
+#' 
+#' @examples
+#' # Example 1: Inspecting slice_artifact structure ----
+#' # Understand the internal list-of-lists structure
+#' 
+#' library(data.table)
+#' data(simple_dt_date)
+#' 
+#' # Create a slice_artifact
+#' slices <- slice(
+#'     data = simple_dt_date,
+#'     variables = c("X1", "Y"),
+#'     walk_on = "date",
+#'     L = list(X1 = c(-1, -2), Y = c(-1, -2, -3))
+#' )
+#' 
+#' # View structure
+#' str(slices, max.level = 2)
+#' 
+#' # Inspect attributes
+#' attr(slices, "index")
+#' attr(slices, "L")
+#' class(slices)
+#' 
+#' # Access individual components
+#' slices$Y$`L-1`
+#' slices[["X1"]][["L-2"]]
+#' 
+#' # Example 2: Method dispatch for slice_artifact ----
+#' # Generic functions automatically use slice_artifact methods
+#' 
+#' # Print method: Calls print.slice_artifact()
+#' print(slices)
+#' 
+#' # Summary method: Calls summary.slice_artifact()
+#' summary(slices)
+#' 
+#' # Statistical methods: Call generic.slice_artifact()
+#' mean(slices)
+#' sd(slices)
+#' 
+#' # Check what methods are available
+#' methods(class = "slice_artifact")
 
 new_slice_artifact <- function(list, index, L) {
     class(list) <- c("slice_artifact", "list")
@@ -186,6 +301,69 @@ c_two_slices <- function(s1, s2) {
 #' @param x,y objects of class \code{slice_artifact} for merging
 #' @param ... has no utility other than consistency with the generic
 #' 
+#' @examples
+#' # Example 1: Merging lag and lead features for multi-horizon forecasting ----
+#' # Combine historical predictors (lags) with future targets (leads)
+#' 
+#' library(data.table)
+#' data(simple_dt_date)
+#' 
+#' # Create lag features for predictors
+#' x_lags <- slice(
+#'     data = simple_dt_date,
+#'     variables = c("X1", "X2"),
+#'     walk_on = "date",
+#'     L = c(-1, -2, -3)
+#' )
+#' 
+#' # Create lead features for target variable (forecast horizons)
+#' y_leads <- slice(
+#'     data = simple_dt_date,
+#'     variables = "Y",
+#'     walk_on = "date",
+#'     L = c(1, 3, 7)
+#' )
+#' 
+#' # Merge lags and leads
+#' complete_features <- merge(x_lags, y_leads)
+#' 
+#' print(complete_features)
+#' str(complete_features, max.level = 2)
+#' 
+#' # Index matching ensures temporal alignment
+#' # Now have both predictors (past) and targets (future) for multi-horizon modeling
+#' 
+#' # Example 2: Merging variables with different lag structures ----
+#' # Slice variables separately with different lag depths, then combine
+#' 
+#' # Volatile variable: short lags
+#' x1_slice <- slice(
+#'     data = simple_dt_date,
+#'     variables = "X1",
+#'     walk_on = "date",
+#'     L = c(-1, -2)
+#' )
+#' 
+#' # Slow-moving variable: deeper lags
+#' x2_slice <- slice(
+#'     data = simple_dt_date,
+#'     variables = "X2",
+#'     walk_on = "date",
+#'     L = c(-1, -3, -5, -7)
+#' )
+#' 
+#' # Merge heterogeneous lag patterns
+#' merged <- merge(x1_slice, x2_slice)
+#' 
+#' str(merged, max.level = 2)
+#' 
+#' # Enables flexible feature engineering
+#' # Each variable can have lag structure matching its characteristics
+#' 
+#' @seealso
+#' * \code{\link{slice}} for creating slice artifacts
+#' * \code{\link{as.data.table.slice_artifact}} for converting merged artifacts to modeling format
+#' 
 #' @export
 
 merge.slice_artifact <- function(x, y, ...) {
@@ -289,6 +467,50 @@ combine_features <- function(slice, feature1, feature2, return.all = FALSE) {
 #' @param melt_by name pattern of target columns. Optional, if provided will melt result on them
 #' @param keep.rownames has no utility other than consistency with the generic
 #' @param ... has no utility other than consistency with the generic
+#' 
+#' @examples
+#' # Example 1: Basic conversion to wide format for modeling ----
+#' # Convert slice_artifact to wide data.table (standard model matrix)
+#' 
+#' library(data.table)
+#' data(simple_dt_date)
+#' 
+#' # Create lag features
+#' lags <- slice(
+#'     data = simple_dt_date,
+#'     variables = c("X1", "Y"),
+#'     walk_on = "date",
+#'     L = c(-1, -2, -3)
+#' )
+#' 
+#' # Convert to wide format (default)
+#' model_matrix <- as.data.table(lags)
+#' 
+#' print(head(model_matrix))
+#' 
+#' # Ready for modeling
+#' # Each row: observation at reference time
+#' # Each column: lag feature (e.g., X1_1, X1_2, X1_3 for lags -1, -2, -3)
+#' # Can pass directly to lm(), glm(), forecast models
+#' 
+#' # Example 2: Long format with melt_by parameter ----
+#' # Create long format for specific use cases (e.g., visualization, mixed models)
+#' 
+#' # Convert to long format, melting variable X1
+#' long_format <- as.data.table(lags, melt_by = "X1")
+#' 
+#' print(head(long_format, 15))
+#' 
+#' # melt_by uses data.table::patterns() to select columns
+#' # "X1" selects all X1_* columns and melts them into rows
+#' # Useful for:
+#' # - Visualization with ggplot2 (facet by variable)
+#' # - Mixed effects models
+#' # - Hierarchical forecasting models
+#' 
+#' @seealso
+#' * \code{\link{slice}} for creating slice artifacts
+#' * \code{\link{merge.slice_artifact}} for combining artifacts before conversion
 #' 
 #' @export
 

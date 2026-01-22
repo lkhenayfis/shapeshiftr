@@ -18,3 +18,50 @@
 \description{
 Transforms an object of class \code{slice_artifact} to a \code{data.table}
 }
+\examples{
+# Example 1: Basic conversion to wide format for modeling ----
+# Convert slice_artifact to wide data.table (standard model matrix)
+
+library(data.table)
+data(simple_dt_date)
+
+# Create lag features
+lags <- slice(
+    data = simple_dt_date,
+    variables = c("X1", "Y"),
+    walk_on = "date",
+    L = c(-1, -2, -3)
+)
+
+# Convert to wide format (default)
+model_matrix <- as.data.table(lags)
+
+print(head(model_matrix))
+
+# Ready for modeling
+# Each row: observation at reference time
+# Each column: lag feature (e.g., X1_1, X1_2, X1_3 for lags -1, -2, -3)
+# Can pass directly to lm(), glm(), forecast models
+
+# Example 2: Long format with melt_by parameter ----
+# Create long format for specific use cases (e.g., visualization, mixed models)
+
+# Convert to long format, melting variable X1
+long_format <- as.data.table(lags, melt_by = "X1")
+
+print(head(long_format, 15))
+
+# melt_by uses data.table::patterns() to select columns
+# "X1" selects all X1_* columns and melts them into rows
+# Useful for:
+# - Visualization with ggplot2 (facet by variable)
+# - Mixed effects models
+# - Hierarchical forecasting models
+
+}
+\seealso{
+\itemize{
+\item \code{\link{slice}} for creating slice artifacts
+\item \code{\link{merge.slice_artifact}} for combining artifacts before conversion
+}
+}
