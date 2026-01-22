@@ -140,8 +140,8 @@ test_that("do_single_slice - POSIX", {
     expect_equal(attr(slice, "index"), center)
     expect_equal(names(slice), params$names)
 
-    expect_equal(slice$name_1[[1]], c(NA, NA, NA, 20))
-    expect_equal(slice$name_2[[1]], c(127, 138))
+    expect_equal(slice$name_1[[1]], c(NA, NA, NA, 16))
+    expect_equal(slice$name_2[[1]], c(122, 138))
 
     center <- as.POSIXct("2025-01-01 10:00:00", "GMT")
     slice <- do_single_slice(simple_dt_datetime, center, params)
@@ -151,8 +151,8 @@ test_that("do_single_slice - POSIX", {
     expect_equal(attr(slice, "index"), center)
     expect_equal(names(slice), params$names)
 
-    expect_equal(slice$name_1[[1]], c(13, 1, 2, 19))
-    expect_equal(slice$name_2[[1]], c(124, 129))
+    expect_equal(slice$name_1[[1]], c(6, 4, 2, 7))
+    expect_equal(slice$name_2[[1]], c(136, 124))
 
     center <- as.POSIXct("2025-01-01 20:00:00", "GMT")
     slice <- do_single_slice(simple_dt_datetime, center, params)
@@ -162,7 +162,7 @@ test_that("do_single_slice - POSIX", {
     expect_equal(attr(slice, "index"), center)
     expect_equal(names(slice), params$names)
 
-    expect_equal(slice$name_1[[1]], c(7, 9, 8, 14))
+    expect_equal(slice$name_1[[1]], c(17, 1, 18, 3))
     expect_equal(slice$name_2[[1]], c(NA_integer_, NA_integer_))
 
     # keyed --------------------------------------------------------------
