@@ -41,7 +41,99 @@ You can install the development version of shapeshiftr from
 devtools::install_github("lkhenayfis/shapeshiftr")
 ```
 
-## Example
+## Main functionalities
+
+### Pipes
+
+The `shapeshiftr` package provides a flexible pipe system for defining data transformations through
+closure generators. Pipes allow you to define transformation workflows that can be parsed and
+evaluated on data.
+
+#### Simple transformation pipes
+
+A pipe transformation is defined by a closure generator - a function that returns another function.
+Here's a simple example that computes summary statistics:
+
+```{r}
+# Define a closure generator for summary statistics
+gen_closure_summary <- function(...) function(x) summary(x)
+
+# Define a pipe that applies this transformation to mtcars
+raw_pipe <- list(
+    on = "mtcars",
+    transforms = list(
+        list(fun = "gen_closure_summary")
+    )
+)
+
+# Parse the pipe to generate the closure
+parsed_pipe <- parse_single_pipe(raw_pipe)
+
+# Evaluate the pipe on the data
+result <- eval_single_pipe(parsed_pipe, env = list(mtcars = mtcars))
+result
+```
+
+#### Pipes with computed parameters
+
+More sophisticated pipes can perform computations and use the results as parameters in the returned
+closure. This example shows a scaling transformation that centers data to zero mean and scales to
+unit variance:
+
+```{r}
+# Define a closure generator that computes scaling parameters
+gen_closure_scale <- function(x, ...) {
+    # Compute mean and sd from the training data x (happens once during parsing)
+    means <- colMeans(x, na.rm = TRUE)
+    sds <- apply(x, 2, sd, na.rm = TRUE)
+    
+    # Return a closure that uses these pre-computed parameters
+    function(x) {
+        as.data.frame(scale(x, center = means, scale = sds))
+    }
+}
+
+# Define a pipe that scales the data
+raw_pipe <- list(
+    on = "mtcars",
+    transforms = list(
+        list(fun = "gen_closure_scale")
+    )
+)
+
+# Parse and evaluate
+parsed_pipe <- parse_single_pipe(raw_pipe, env = list(mtcars = mtcars), enclos = environment())
+scaled_data <- eval_single_pipe(parsed_pipe, env = list(mtcars = mtcars), enclos = environment())
+head(scaled_data)
+```
+
+#### Chaining multiple transformations
+
+Pipes can chain multiple transformations together. Each transformation
+receives the output of the previous one:
+
+```{r}
+# Define a filter closure generator
+gen_closure_filter <- function(by, value, ...) {
+    function(x) x[x[[by]] == value, ]
+}
+
+# Combine filtering and summary
+raw_pipe <- list(
+    on = "mtcars",
+    transforms = list(
+        list(fun = "gen_closure_filter", by = "cyl", value = 6),
+        list(fun = "gen_closure_summary")
+    )
+)
+
+# Parse and evaluate
+parsed_pipe <- parse_single_pipe(raw_pipe, env = list(mtcars = mtcars), enclos = environment())
+result <- eval_single_pipe(parsed_pipe, env = list(mtcars = mtcars), enclos = environment())
+result
+```
+
+### Slicing
 
 This is a basic example that demonstrates how `shapeshiftr` is meant to aid in data manipulation in
 it's canonical use case.
@@ -83,3 +175,116 @@ The resulting data.table is
 ```{r}
 print(head(dt, 10))
 ```
+
+## Full Example: Training and Inference Consistency
+
+One of the most powerful features of the pipe system is its ability to maintain transformation
+consistency between training and inference. When training a forecasting model, you often need to
+apply transformations (like scaling) to your data. During inference, you must apply the *exact same*
+transformations using the *same parameters* computed from the training data.
+
+This example demonstrates how to:
+
+1. Create pipes that scale data then perform slicing
+2. Parse and evaluate pipes on training data (computing scaling parameters)
+3. Re-use the same parsed pipes on test data (applying the same scaling parameters)
+
+```{r}
+# Split the data into training (first half) and test (second half)
+n <- nrow(obs)
+train_obs <- obs[1:floor(n / 2)]
+test_obs <- obs[(floor(n / 2) + 1):n]
+```
+
+Now we define closure generators for scaling and slicing:
+
+```{r}
+# Closure generator that computes scaling parameters and returns a function
+# that applies those parameters
+gen_closure_scale_cols <- function(x, cols, ...) {
+    # Compute scaling parameters from x (training data) - happens ONCE during parsing
+    means <- colMeans(x[, cols, with = FALSE], na.rm = TRUE)
+    sds <- sapply(x[, cols, with = FALSE], sd, na.rm = TRUE)
+
+    # Return a closure that uses these pre-computed, fixed parameters
+    function(x) {
+        result <- copy(x)
+        for (col in cols) {
+            result[[col]] <- (x[[col]] - means[col]) / sds[col]
+        }
+        result
+    }
+}
+
+# Closure generator for slicing
+gen_closure_slice_simple <- function(x, index_var, variables, L, ...) {
+    # The returned closure performs slicing
+    # x is the training data but we don't use it here - slicing doesn't need "training"
+    function(x) {
+        result <- slice(x, index_var, variables = variables, L = L)
+        as.data.table(result)
+    }
+}
+```
+
+Define the pipe that first scales, then slices:
+
+```{r}
+# Create a pipe that scales X1, X2, Y, then creates lagged features
+pipe_def <- list(
+    on = "data",
+    transforms = list(
+        # First: scale the data
+        list(
+            fun = "gen_closure_scale_cols",
+            cols = c("X1", "X2", "Y")
+        ),
+        # Then: create lagged features
+        list(
+            fun = "gen_closure_slice_simple",
+            index_var = "date",
+            variables = c("X1", "X2", "Y"),
+            L = -2:0
+        )
+    )
+)
+```
+
+**Step 1: Parse and evaluate on training data**
+
+```{r}
+# Parse the pipe using TRAINING data - this computes scaling parameters from training data
+parsed_pipe_train <- parse_single_pipe(pipe_def,
+    env = list(data = train_obs),
+    enclos = environment())
+
+# Evaluate on training data
+train_result <- eval_single_pipe(parsed_pipe_train,
+    env = list(data = train_obs),
+    enclos = environment())
+
+cat("Training data after scaling and slicing:\n")
+print(head(train_result, 5))
+print(tail(train_result, 5))
+```
+
+**Step 2: Evaluate the SAME parsed pipe on test data**
+
+The key insight: we use `parsed_pipe_train` (which contains scaling parameters from training) on test data:
+
+```{r}
+# Evaluate the SAME parsed pipe on test data
+# This applies the scaling parameters learned from TRAINING data
+test_result <- eval_single_pipe(parsed_pipe_train,
+    env = list(data = test_obs),
+    enclos = environment())
+
+cat("\nTest data after applying TRAINING scaling and slicing:\n")
+print(head(test_result, 5))
+print(tail(test_result, 5))
+```
+
+This workflow demonstrates the core value proposition of the pipe system: **transformation
+consistency**. By parsing pipes on training data and reusing them on test/inference data, you
+ensure that all transformations use the same parameters, which is critical for model performance
+and avoiding data leakage.
