@@ -9,9 +9,9 @@
 \alias{keyed_dt_datetime}
 \title{Example Datasets}
 \format{
-An object of class \code{data.table} (inherits from \code{data.frame}) with 20 rows and 5 columns.
+An object of class \code{data.table} (inherits from \code{data.frame}) with 20 rows and 7 columns.
 
-An object of class \code{data.table} (inherits from \code{data.frame}) with 20 rows and 5 columns.
+An object of class \code{data.table} (inherits from \code{data.frame}) with 20 rows and 7 columns.
 
 An object of class \code{data.table} (inherits from \code{data.frame}) with 100 rows and 6 columns.
 
@@ -42,20 +42,32 @@ There are four datasets included:
 In the following, all values are merely illustrative and have no bearing on the actual datasets.
 
 The ones prefixed \code{simple} have a single column of time index, which can be of either type
-\code{Date} or \code{POSIXct}, as indicaded by the suffixes. \code{simple_dt_date} looks like\tabular{lllll}{
-   date \tab X1 \tab X2 \tab X3 \tab Y \cr
-   2025-01-02 \tab 16 \tab -18 \tab 66 \tab 132 \cr
-   2025-01-03 \tab 5 \tab -17 \tab 55 \tab 122 \cr
-   2025-01-04 \tab 12 \tab -16 \tab 68 \tab 138 \cr
-   2025-01-05 \tab 15 \tab -19 \tab 69 \tab 137 \cr
-   2025-01-06 \tab 9 \tab -7 \tab 70 \tab 125 \cr
+\code{Date} or \code{POSIXct}, as indicated by the suffixes. They also include categorical
+variables to demonstrate mixed-type data workflows.
+
+\code{simple_dt_date} looks like:\tabular{lllllll}{
+   date \tab X1 \tab X2 \tab X3 \tab Y \tab day_type \tab weather_condition \cr
+   2025-01-02 \tab 16 \tab -18 \tab 66 \tab 132 \tab weekday \tab sunny \cr
+   2025-01-03 \tab 5 \tab -17 \tab 55 \tab 122 \tab weekday \tab cloudy \cr
+   2025-01-04 \tab 12 \tab -16 \tab 68 \tab 138 \tab weekend \tab rainy \cr
+   2025-01-05 \tab 15 \tab -19 \tab 69 \tab 137 \tab weekend \tab sunny \cr
+   2025-01-06 \tab 9 \tab -7 \tab 70 \tab 125 \tab weekday \tab cloudy \cr
 }
 
 
-\code{simple_dt_datetime} is similar, except instead of column \code{date}, there is a column
-named \code{datetime} of hour by hour times.
+The categorical columns are:
+\itemize{
+\item \code{day_type}: Factor with levels \code{"weekday"} and \code{"weekend"},
+determined by the day of the week. Used to demonstrate categorical variable handling.
+\item \code{weather_condition}: Factor with levels \code{"sunny"}, \code{"cloudy"},
+and \code{"rainy"}, randomly assigned. Used to demonstrate multi-level factor encoding.
+}
 
-Keyed datasets are very similar, except for having an aditional time index column. For example,
+\code{simple_dt_datetime} is similar, except instead of column \code{date}, there is a column
+named \code{datetime} of hour by hour times. The \code{day_type} column for this dataset
+has levels \code{"work_hours"} (9am-5pm) and \code{"off_hours"}, based on the hour of day.
+
+Keyed datasets are very similar, except for having an additional time index column. For example,
 \code{keyed_dt_date} looks like\tabular{llllll}{
    date \tab target_date \tab X1 \tab X2 \tab X3 \tab Y \cr
    2025-01-02 \tab 2025-01-03 \tab 16 \tab -18 \tab 66 \tab 132 \cr
