@@ -1,3 +1,4 @@
-informals
-profiling
+informals/
+profiling/
 .Renviron
+.vscode/
