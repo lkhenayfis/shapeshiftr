@@ -44,11 +44,17 @@ for more details
 Operates on a time-indexed data.frame-like to generate appropriate regressors and target variable
 }
 \details{
-\code{walk_on} should be a time type column on which the reference times for slicing are searched
-for. There is also \code{slice_by}, which indicates on which column the lags/lead times are
-searched for. This may be confusing at first, but is intended to allow for simpler use of slicing
-when \code{data} is keyed, for example in the case of forecasting data in which there is a column
-of when the forecast was executed and which is the target time of the forecast.
+\subsection{Simple vs Keyed Slicing}{
+
+\strong{Simple slicing} occurs when \code{walk_on == slice_on} (the default).
+This creates a standard sliding window where the index used for centering
+is the same as the index used for extracting lag/lead values. Use simple
+slicing for typical autoregressive feature engineering.
+
+\strong{Keyed slicing} occurs when \code{walk_on != slice_on}. This is essential
+for forecast datasets with dual temporal structure (e.g., forecast execution
+date and target date). The function groups by \code{walk_on} values and
+extracts features based on \code{slice_on} values within each group.
 
 For example, the included data.table \code{keyed_dt_date}\tabular{llllll}{
    date \tab target_date \tab X1 \tab X2 \tab X3 \tab Y \cr
@@ -62,12 +68,41 @@ For example, the included data.table \code{keyed_dt_date}\tabular{llllll}{
 
 If \code{walk_on = "date"} and \code{slice_on = "target_date"}, slices will be generated for
 values in \code{"date"}, but the actual subset will be based on \code{target_date}.
+}
+
+\subsection{Lag and Lead Sign Convention}{
+\itemize{
+\item \strong{Negative L values}: Lags (past values). L = -1 means "1 period ago"
+\item \strong{Zero}: Current period. L = 0 means "same period as walk_on"
+\item \strong{Positive L values}: Leads (future values). L = 1 means "1 period ahead"
+}
+
+The "period" unit is determined by temporal resolution of \code{walk_on}
+(e.g., days for Date class, datetime intervals for POSIXct).
+}
+
+\subsection{Temporal Resolution}{
+
+Temporal resolution is automatically detected from \code{walk_on} column class:
+\itemize{
+\item \strong{Date}: Daily resolution
+\item \strong{POSIXct/POSIXlt}: Datetime resolution (hours, minutes, seconds)
+}
+
+The \code{step} parameter controls stride through \code{walk_on}.
+Can be integer (number of periods) or string ("2 hours", "1 day").
+}
+
+\subsection{Variable Selection}{
 
 Argument \code{variables} defines which columns in \code{data} are to be sliced. If it is empty,
 all variables except \code{walk_on} and \code{key_by} are used. This argument also accepts
 duplicated values. This is intended to facilitate different forms of slicing a single variable
 in the data. One example would be if one is extracting both target future values and explanatory
 past values for fitting an autoregressive model.
+}
+
+\subsection{Lag Structure Specification}{
 
 Lag and lead times, passed through argument \code{L}, are differentiated by their sign. Negative
 values are interpreted as lags and positive ones as leads. The canonical way to pass this
@@ -75,6 +110,82 @@ argument is a names list indicating lags/leads for each variable. If unamed, it 
 \code{L} is in the same order as \code{variables}. If \code{L} is a single integer or vector of
 integers, it is assumed all variables should be sliced equally.
 }
+}
+\examples{
+# Example 1: Simple lag features for autoregressive forecasting ----
+# Create lag features to predict tomorrow's Y using past Y values
+
+library(data.table)
+data(simple_dt_date)
+
+# Create 1, 2, 3-day lags of Y for autoregressive model
+# L = c(-1, -2, -3): negative values indicate lags (past values)
+y_lags <- slice(
+    data = simple_dt_date,
+    variables = "Y",
+    walk_on = "date",
+    L = c(-1, -2, -3)
+)
+
+# Inspect structure: slice_artifact contains list of lag values
+print(y_lags)
+str(y_lags, max.level = 2)
+
+# Note: walk_on == slice_on (default) creates standard sliding window
+# This is "simple slicing" - centering and slicing on same index
+
+# Example 2: Keyed slicing for forecast data integration ----
+# When data has forecast execution date AND target date, use keyed slicing
+
+data(keyed_dt_date)
+
+# keyed_dt_date structure:
+# - date: when forecast was executed
+# - target_date: what date the forecast targets
+# - X1, X2, X3, Y: predictor and response variables
+
+# Create lag features aligned to TARGET dates, grouped by execution date
+# walk_on = "date": group by forecast execution date
+# slice_on = "target_date": slice based on target dates
+keyed_lags <- slice(
+    data = keyed_dt_date,
+    variables = "X1",
+    walk_on = "date",
+    slice_on = "target_date",
+    L = c(-1, -2)
+)
+
+print(keyed_lags)
+
+# This is "keyed slicing" - walk on one index, slice on another
+# Critical for integrating observed data (target_date) with forecast context (date)
+
+# Example 3: Multi-variable slicing with different lag structures ----
+# Different predictors may need different lag depths
+
+# Scenario: X1 volatile (1-2 day lags), X2 slow-moving (1-5 day lags)
+multi_lags <- slice(
+    data = simple_dt_date,
+    variables = c("X1", "X2"),
+    walk_on = "date",
+    L = list(
+        X1 = c(-1, -2),
+        X2 = c(-1, -3, -5, -7)
+    )
+)
+
+print(multi_lags)
+str(multi_lags, max.level = 2)
+
+# List specification of L allows flexible lag patterns
+# Names in L must match variables
+# Can also include lead times: L = c(-2, -1, 0, 1, 2) for centered window
+
+}
 \seealso{
-\code{\link{new_slice_artifact}} for in-depth details of the returned object
+\itemize{
+\item \code{\link{new_slice_artifact}} for details on the returned slice_artifact object structure
+\item \code{\link{merge.slice_artifact}} for combining multiple slice artifacts
+\item \code{\link{as.data.table.slice_artifact}} for converting to wide/long format
+}
 }
