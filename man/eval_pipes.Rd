@@ -2,20 +2,20 @@
 % Please edit documentation in R/pipes.r
 \name{eval_pipes}
 \alias{eval_pipes}
-\title{Avalia Lista De Pipes}
+\title{Evaluate List of Pipes}
 \usage{
 eval_pipes(pipes, env = parent.frame(), enclos = parent.frame())
 }
 \arguments{
-\item{pipes}{lista de pipes ja parsed por \code{parse_pipes}}
+\item{pipes}{list of pipes already parsed by \code{parse_pipes}}
 
-\item{env}{ambiente onde o pipe sera avaliado}
+\item{env}{environment where the pipe will be evaluated}
 
-\item{enclos}{ambiente de encerramento para avaliacao das closures}
+\item{enclos}{enclosing environment for evaluation of the closures}
 }
 \value{
-data.table unico combinando os resultados da aplicacao de todos os pipes em \code{pipes}
+single data.table combining the results of applying all pipes in \code{pipes}
 }
 \description{
-Wrapper simples para loop de \code{eval_single_pipe} em multiplos pipes
+Simple wrapper for looping \code{eval_single_pipe} over multiple pipes
 }

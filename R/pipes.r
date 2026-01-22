@@ -1,37 +1,35 @@
-# PARSE DE PIPES -----------------------------------------------------------------------------------
+# PARSE PIPES --------------------------------------------------------------------------------------
 
-#' Parse Um Unico Pipe
+#' Parse a Single Pipe
 #' 
-#' Interpreta a definicao de um unico pipe, gerando as closures definidas
+#' Interprets the definition of a single pipe, generating the defined closures
 #' 
-#' Ambos `env` e `enclos` funcionam tal qual como em `eval`, permitindo que `env` corresponda a uma
-#' lista nomeada ou data.frame, e `enclos` seja um ambiente onde funcoes auxiliares podem ser
-#' definidas
+#' Both `env` and `enclos` function just as in `eval`, allowing `env` to correspond to a named
+#' list or data.frame, and `enclos` to be an environment where helper functions can be defined
 #' 
-#' `raw_pipe` deve ser uma lista nomeada de dois argumentos: `"on"` e `"transforms`. `"on"` e
-#' simplesmente um vetor de no maximo dois elementos indicando os nomes das variaveis nas quais
-#' a(s) transformacao(oes) opera(m). `"transforms"` deve ser uma lista de especificacoes das
-#' transformacoes. Cada transformacao e por sua vez uma lista de ao menos um elemento nomeado,
-#' `"fun"`, uma string indicando o nome da geradora de closure a ser chamada. Alem de `"fun"` outros
-#' elementos podem existir indicando parametrizacao da geradora de closure. Veja `Exemplos` para 
-#' uma ilustracao de pipe bruto.
+#' `raw_pipe` should be a named list with two arguments: `"on"` and `"transforms"`. `"on"` is
+#' simply a vector of at most two elements indicating the names of the variables on which
+#' the transformation(s) operate(s). `"transforms"` should be a list of transformation specifications.
+#' Each transformation is in turn a list with at least one named element, `"fun"`, a string indicating
+#' the name of the closure generator to be called. In addition to `"fun"`, other elements may exist
+#' indicating parameterization of the closure generator. See `Examples` for an illustration of a raw pipe.
 #' 
-#' Note que as funcoes nas definicoes de transformacao devem sempre ser geradoras de closures e
-#' necessariamente precisam incluir o arumento variatico `...`. Isto e necessario porque, numa etapa
-#' posterior, estas geradoras serao interpretadas para entao produzir o pipe parsed no qual
-#' `transforms` sao, de fato, funcoes a serem chamadas no dado.
+#' Note that functions in transformation definitions must always be closure generators and must
+#' necessarily include the variadic argument `...`. This is necessary because, at a later stage,
+#' these generators will be interpreted to then produce the parsed pipe in which `transforms` are,
+#' in fact, functions to be called on the data.
 #' 
-#' @param raw_pipe uma lista definindo pipe singular, isto e, com elemento `"on"` e `"transforms"`
-#' @param env ambiente onde os pipes brutos serao avaliados
-#' @param enclos ambiente de encerramento para avaliacao das closures
+#' @param raw_pipe a list defining a singular pipe, that is, with element `"on"` and `"transforms"`
+#' @param env environment where the raw pipes will be evaluated
+#' @param enclos enclosing environment for evaluation of the closures
 #' 
 #' @examples 
 #' 
-#' # geradora de uma closure de unico argumento `x` que chama filtra este argumento com base em
-#' # outros parametros especificados
+#' # generator of a closure with single argument `x` that filters this argument based on
+#' # other specified parameters
 #' gen_closure_filter <- function(by, value, ...) function(x) x[x[[by]] == value, ]
 #' 
-#' # geradora de uma closure de unico argumento `x` que chama `summary` neste argumento
+#' # generator of a closure with single argument `x` that calls `summary` on this argument
 #' gen_closure_summary <- function(...) function(x) summary(x)
 #' 
 #' raw_pipe <- list(
@@ -49,7 +47,7 @@
 #' 
 #' parsed_pipe <- shapeshiftr:::parse_single_pipe(raw_pipe)
 #' 
-#' @return lista `raw_pipe` com elemento `"transforms"` avaliado para as closures definidas
+#' @return list `raw_pipe` with element `"transforms"` evaluated to the defined closures
 #' 
 #' @export
 
@@ -76,15 +74,15 @@ parse_single_pipe <- function(raw_pipe, env = parent.frame(), enclos = parent.fr
     return(raw_pipe)
 }
 
-#' Parse Lista De Pipes
+#' Parse List of Pipes
 #' 
-#' Wrapper simples para loop de `parse_single_pipe` em multiplos pipes
+#' Simple wrapper for looping `parse_single_pipe` over multiple pipes
 #' 
-#' @param raw_pipes lista definindo diversos pipes
-#' @param env ambiente onde o pipe sera avaliado
-#' @param enclos ambiente de encerramento para avaliacao das closures
+#' @param raw_pipes list defining various pipes
+#' @param env environment where the pipe will be evaluated
+#' @param enclos enclosing environment for evaluation of the closures
 #' 
-#' @return lista `raw_pipes` com elementos `"transforms"` de cada pipe avaliados
+#' @return list `raw_pipes` with elements `"transforms"` of each pipe evaluated
 #' 
 #' @export
 
@@ -92,21 +90,20 @@ parse_pipes <- function(raw_pipes, env = parent.frame(), enclos = parent.frame()
     lapply(raw_pipes, parse_single_pipe, env = env, enclos = enclos)
 }
 
-# EVAL DE PIPES ------------------------------------------------------------------------------------
+# EVALUATE PIPES -----------------------------------------------------------------------------------
 
-#' Avalia Um Unico Pipe
+#' Evaluate a Single Pipe
 #' 
-#' Aplica as closures em um `pipe` já parsed ao dado definido em `"on"`
+#' Applies the closures in a `pipe` already parsed to the data defined in `"on"`
 #' 
-#' Ambos `env` e `enclos` funcionam tal qual como em `eval`, permitindo que `env` corresponda a uma
-#' lista nomeada ou data.frame, e `enclos` seja um ambiente onde funcoes auxiliares podem ser
-#' definidas
+#' Both `env` and `enclos` function just as in `eval`, allowing `env` to correspond to a named
+#' list or data.frame, and `enclos` to be an environment where helper functions can be defined
 #' 
-#' @param pipe um pipe parsed por `parse_single_pipe`
-#' @param env ambiente onde o pipe sera avaliado
-#' @param enclos ambiente de encerramento para avaliacao das closures
+#' @param pipe a pipe parsed by `parse_single_pipe`
+#' @param env environment where the pipe will be evaluated
+#' @param enclos enclosing environment for evaluation of the closures
 #' 
-#' @return resultado da aplicacao das closures em `transforms` ao(s) dado(s) em `"on"`
+#' @return result of applying the closures in `transforms` to the data in `"on"`
 #' 
 #' @export
 
@@ -131,15 +128,15 @@ eval_single_pipe <- function(pipe, env = parent.frame(), enclos = parent.frame()
     return(x)
 }
 
-#' Avalia Lista De Pipes
+#' Evaluate List of Pipes
 #' 
-#' Wrapper simples para loop de `eval_single_pipe` em multiplos pipes
+#' Simple wrapper for looping `eval_single_pipe` over multiple pipes
 #' 
-#' @param pipes lista de pipes ja parsed por `parse_pipes`
-#' @param env ambiente onde o pipe sera avaliado
-#' @param enclos ambiente de encerramento para avaliacao das closures
+#' @param pipes list of pipes already parsed by `parse_pipes`
+#' @param env environment where the pipe will be evaluated
+#' @param enclos enclosing environment for evaluation of the closures
 #' 
-#' @return data.table unico combinando os resultados da aplicacao de todos os pipes em `pipes`
+#' @return single data.table combining the results of applying all pipes in `pipes`
 #' 
 #' @export
 
@@ -147,24 +144,24 @@ eval_pipes <- function(pipes, env = parent.frame(), enclos = parent.frame()) {
     lapply(pipes, eval_single_pipe, env = env, enclos = enclos)
 }
 
-#' Combinacao De Resultados De Pipes
+#' Combination of Pipe Results
 #' 
-#' Combina saidas de pipes resultantes de uma chamada de `eval_pipes`
+#' Combines outputs from pipes resulting from a call to `eval_pipes`
 #' 
-#' Essencialmente esta funcao e um wrapper de `Reduce` aplicado a `evals` com a funcao
-#' `combine_fun`. Em funcao disto, `combine_fun` deve ser uma funcao de minimamente dois argumentos
-#' `x` e `y`, bem como o argumento variatico `...` para consistencia entre chamadas. Demais
-#' argumentos opcionais sao permitidos e serao repassados para `combine_fun`.
+#' Essentially this function is a wrapper of `Reduce` applied to `evals` with the function
+#' `combine_fun`. Because of this, `combine_fun` should be a function with at least two arguments
+#' `x` and `y`, as well as the variadic argument `...` for consistency between calls. Other
+#' optional arguments are permitted and will be passed to `combine_fun`.
 #' 
-#' `default_combine` e apenas uma chamada de `merge` utilizando `by = 1`, isto e, merge de todos
-#' os dados em `evals` pela primeira coluna de cada um deles.
+#' `default_combine` is merely a call to `merge` using `by = 1`, that is, merging all
+#' data in `evals` by the first column of each one.
 #' 
-#' @param evals lista de elementos a serem combinados, tipicamente o resultado de `eval_pipes`
-#' @param combine_fun funcao de combinacao a ser aplicada, por default `default_combine`. Veja
-#'     Detalhes
-#' @param ... argumentos adicionais a serem passados para `combine_fun`
+#' @param evals list of elements to be combined, typically the result of `eval_pipes`
+#' @param combine_fun combination function to be applied, by default `default_combine`. See
+#'     Details
+#' @param ... additional arguments to be passed to `combine_fun`
 #' 
-#' @return resultado da combinacao
+#' @return result of the combination
 #' 
 #' @export
 

@@ -2,25 +2,24 @@
 % Please edit documentation in R/pipes.r
 \name{eval_single_pipe}
 \alias{eval_single_pipe}
-\title{Avalia Um Unico Pipe}
+\title{Evaluate a Single Pipe}
 \usage{
 eval_single_pipe(pipe, env = parent.frame(), enclos = parent.frame())
 }
 \arguments{
-\item{pipe}{um pipe parsed por \code{parse_single_pipe}}
+\item{pipe}{a pipe parsed by \code{parse_single_pipe}}
 
-\item{env}{ambiente onde o pipe sera avaliado}
+\item{env}{environment where the pipe will be evaluated}
 
-\item{enclos}{ambiente de encerramento para avaliacao das closures}
+\item{enclos}{enclosing environment for evaluation of the closures}
 }
 \value{
-resultado da aplicacao das closures em \code{transforms} ao(s) dado(s) em \code{"on"}
+result of applying the closures in \code{transforms} to the data in \code{"on"}
 }
 \description{
-Aplica as closures em um \code{pipe} já parsed ao dado definido em \code{"on"}
+Applies the closures in a \code{pipe} already parsed to the data defined in \code{"on"}
 }
 \details{
-Ambos \code{env} e \code{enclos} funcionam tal qual como em \code{eval}, permitindo que \code{env} corresponda a uma
-lista nomeada ou data.frame, e \code{enclos} seja um ambiente onde funcoes auxiliares podem ser
-definidas
+Both \code{env} and \code{enclos} function just as in \code{eval}, allowing \code{env} to correspond to a named
+list or data.frame, and \code{enclos} to be an environment where helper functions can be defined
 }

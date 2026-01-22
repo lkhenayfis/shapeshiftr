@@ -2,20 +2,20 @@
 % Please edit documentation in R/pipes.r
 \name{parse_pipes}
 \alias{parse_pipes}
-\title{Parse Lista De Pipes}
+\title{Parse List of Pipes}
 \usage{
 parse_pipes(raw_pipes, env = parent.frame(), enclos = parent.frame())
 }
 \arguments{
-\item{raw_pipes}{lista definindo diversos pipes}
+\item{raw_pipes}{list defining various pipes}
 
-\item{env}{ambiente onde o pipe sera avaliado}
+\item{env}{environment where the pipe will be evaluated}
 
-\item{enclos}{ambiente de encerramento para avaliacao das closures}
+\item{enclos}{enclosing environment for evaluation of the closures}
 }
 \value{
-lista \code{raw_pipes} com elementos \code{"transforms"} de cada pipe avaliados
+list \code{raw_pipes} with elements \code{"transforms"} of each pipe evaluated
 }
 \description{
-Wrapper simples para loop de \code{parse_single_pipe} em multiplos pipes
+Simple wrapper for looping \code{parse_single_pipe} over multiple pipes
 }

@@ -2,48 +2,46 @@
 % Please edit documentation in R/pipes.r
 \name{parse_single_pipe}
 \alias{parse_single_pipe}
-\title{Parse Um Unico Pipe}
+\title{Parse a Single Pipe}
 \usage{
 parse_single_pipe(raw_pipe, env = parent.frame(), enclos = parent.frame())
 }
 \arguments{
-\item{raw_pipe}{uma lista definindo pipe singular, isto e, com elemento \code{"on"} e \code{"transforms"}}
+\item{raw_pipe}{a list defining a singular pipe, that is, with element \code{"on"} and \code{"transforms"}}
 
-\item{env}{ambiente onde os pipes brutos serao avaliados}
+\item{env}{environment where the raw pipes will be evaluated}
 
-\item{enclos}{ambiente de encerramento para avaliacao das closures}
+\item{enclos}{enclosing environment for evaluation of the closures}
 }
 \value{
-lista \code{raw_pipe} com elemento \code{"transforms"} avaliado para as closures definidas
+list \code{raw_pipe} with element \code{"transforms"} evaluated to the defined closures
 }
 \description{
-Interpreta a definicao de um unico pipe, gerando as closures definidas
+Interprets the definition of a single pipe, generating the defined closures
 }
 \details{
-Ambos \code{env} e \code{enclos} funcionam tal qual como em \code{eval}, permitindo que \code{env} corresponda a uma
-lista nomeada ou data.frame, e \code{enclos} seja um ambiente onde funcoes auxiliares podem ser
-definidas
+Both \code{env} and \code{enclos} function just as in \code{eval}, allowing \code{env} to correspond to a named
+list or data.frame, and \code{enclos} to be an environment where helper functions can be defined
 
-\code{raw_pipe} deve ser uma lista nomeada de dois argumentos: \code{"on"} e \verb{"transforms}. \code{"on"} e
-simplesmente um vetor de no maximo dois elementos indicando os nomes das variaveis nas quais
-a(s) transformacao(oes) opera(m). \code{"transforms"} deve ser uma lista de especificacoes das
-transformacoes. Cada transformacao e por sua vez uma lista de ao menos um elemento nomeado,
-\code{"fun"}, uma string indicando o nome da geradora de closure a ser chamada. Alem de \code{"fun"} outros
-elementos podem existir indicando parametrizacao da geradora de closure. Veja \code{Exemplos} para
-uma ilustracao de pipe bruto.
+\code{raw_pipe} should be a named list with two arguments: \code{"on"} and \code{"transforms"}. \code{"on"} is
+simply a vector of at most two elements indicating the names of the variables on which
+the transformation(s) operate(s). \code{"transforms"} should be a list of transformation specifications.
+Each transformation is in turn a list with at least one named element, \code{"fun"}, a string indicating
+the name of the closure generator to be called. In addition to \code{"fun"}, other elements may exist
+indicating parameterization of the closure generator. See \code{Examples} for an illustration of a raw pipe.
 
-Note que as funcoes nas definicoes de transformacao devem sempre ser geradoras de closures e
-necessariamente precisam incluir o arumento variatico \code{...}. Isto e necessario porque, numa etapa
-posterior, estas geradoras serao interpretadas para entao produzir o pipe parsed no qual
-\code{transforms} sao, de fato, funcoes a serem chamadas no dado.
+Note that functions in transformation definitions must always be closure generators and must
+necessarily include the variadic argument \code{...}. This is necessary because, at a later stage,
+these generators will be interpreted to then produce the parsed pipe in which \code{transforms} are,
+in fact, functions to be called on the data.
 }
 \examples{
 
-# geradora de uma closure de unico argumento `x` que chama filtra este argumento com base em
-# outros parametros especificados
+# generator of a closure with single argument `x` that filters this argument based on
+# other specified parameters
 gen_closure_filter <- function(by, value, ...) function(x) x[x[[by]] == value, ]
 
-# geradora de uma closure de unico argumento `x` que chama `summary` neste argumento
+# generator of a closure with single argument `x` that calls `summary` on this argument
 gen_closure_summary <- function(...) function(x) summary(x)
 
 raw_pipe <- list(

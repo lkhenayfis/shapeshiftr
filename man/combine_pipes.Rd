@@ -2,30 +2,30 @@
 % Please edit documentation in R/pipes.r
 \name{combine_pipes}
 \alias{combine_pipes}
-\title{Combinacao De Resultados De Pipes}
+\title{Combination of Pipe Results}
 \usage{
 combine_pipes(evals, combine_fun = default_combine, ...)
 }
 \arguments{
-\item{evals}{lista de elementos a serem combinados, tipicamente o resultado de \code{eval_pipes}}
+\item{evals}{list of elements to be combined, typically the result of \code{eval_pipes}}
 
-\item{combine_fun}{funcao de combinacao a ser aplicada, por default \code{default_combine}. Veja
-Detalhes}
+\item{combine_fun}{combination function to be applied, by default \code{default_combine}. See
+Details}
 
-\item{...}{argumentos adicionais a serem passados para \code{combine_fun}}
+\item{...}{additional arguments to be passed to \code{combine_fun}}
 }
 \value{
-resultado da combinacao
+result of the combination
 }
 \description{
-Combina saidas de pipes resultantes de uma chamada de \code{eval_pipes}
+Combines outputs from pipes resulting from a call to \code{eval_pipes}
 }
 \details{
-Essencialmente esta funcao e um wrapper de \code{Reduce} aplicado a \code{evals} com a funcao
-\code{combine_fun}. Em funcao disto, \code{combine_fun} deve ser uma funcao de minimamente dois argumentos
-\code{x} e \code{y}, bem como o argumento variatico \code{...} para consistencia entre chamadas. Demais
-argumentos opcionais sao permitidos e serao repassados para \code{combine_fun}.
+Essentially this function is a wrapper of \code{Reduce} applied to \code{evals} with the function
+\code{combine_fun}. Because of this, \code{combine_fun} should be a function with at least two arguments
+\code{x} and \code{y}, as well as the variadic argument \code{...} for consistency between calls. Other
+optional arguments are permitted and will be passed to \code{combine_fun}.
 
-\code{default_combine} e apenas uma chamada de \code{merge} utilizando \code{by = 1}, isto e, merge de todos
-os dados em \code{evals} pela primeira coluna de cada um deles.
+\code{default_combine} is merely a call to \code{merge} using \code{by = 1}, that is, merging all
+data in \code{evals} by the first column of each one.
 }
