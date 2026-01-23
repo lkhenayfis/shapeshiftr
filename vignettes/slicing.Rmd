@@ -1,0 +1,558 @@
+---
+title: "The Slicing System: Temporal Feature Engineering for Forecasting"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{The Slicing System: Temporal Feature Engineering for Forecasting}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+    collapse = TRUE,
+    comment = "#>",
+    fig.width = 7,
+    fig.height = 5
+)
+```
+
+```{r libraries, message = FALSE}
+library(shapeshiftr)
+library(data.table)
+```
+
+## Introduction
+
+Time series forecasting requires transforming sequential data into a format suitable for
+supervised learning algorithms. This transformation involves creating features from past
+observations (lags) and aligning them with prediction targets. Doing this manually is
+tedious and error-prone.
+
+Consider a simple forecasting scenario where you want to predict tomorrow's value using
+the past three days. Manually creating lag features requires careful indexing:
+
+```{r manual-lag-example, echo = FALSE}
+manual_example <- data.table(
+    date = as.Date(c("2025-01-03", "2025-01-04", "2025-01-05", "2025-01-06")),
+    value = c(15, 11, 18, 14),
+    value_lag1 = c(12, 15, 11, 18),
+    value_lag2 = c(10, 12, 15, 11),
+    value_lag3 = c(NA, 10, 12, 15)
+)
+print(manual_example)
+```
+
+This manual approach has several problems:
+
+- **Error-prone**: Easy to misalign rows when creating multiple lags
+- **Tedious**: Each variable requires separate lag column creation
+- **Inflexible**: Changing lag structure requires rewriting code
+- **No reusability**: Cannot easily apply same structure to new data
+
+The **shapeshiftr** package automates this entire process through its **slicing system**.
+A single `slice()` call creates all lag features with proper temporal alignment, handles
+missing values correctly, and produces model-ready datasets.
+
+### What You Will Learn
+
+This vignette teaches you the complete slicing system for temporal feature engineering:
+
+1. **Introduction** (this section) - Why temporal slicing matters
+2. **Simple Slicing** - Creating lag features from the same temporal index
+3. **Keyed Slicing** - Integrating data with different temporal resolutions
+4. **Building Model-Ready Datasets** - Complete workflow with merge and conversion
+5. **Handling Missing Values** - Strategies for incomplete data (future sprint)
+6. **Multiple Targets** - Forecasting multiple variables simultaneously (future sprint)
+7. **Advanced Patterns** - Complex temporal relationships (future sprint)
+8. **Best Practices** - Production guidelines and performance tips (future sprint)
+
+This sprint covers sections 1-4, providing the foundation for all temporal feature
+engineering workflows in shapeshiftr.
+
+### Vignette Structure
+
+Sections 2-3 introduce the two core slicing modes (**simple** and **keyed**), while
+Section 4 demonstrates the essential workflow for combining these slicing results into
+final model-ready datasets. By the end of Section 4, you will be able to build complete
+forecasting feature matrices ready for any modeling framework.
+
+
+## Simple Slicing
+
+**Simple slicing** occurs when you walk and slice on the same temporal index. This is
+the most common scenario in forecasting: creating lag features where past values of
+variables become predictors for future values.
+
+The defining characteristic is: **`walk_on == slice_on`**
+
+This creates autoregressive features where each row in the result represents a prediction
+task, with columns containing lagged values of your variables.
+
+### Concept: Walking and Slicing on the Same Index
+
+When you call `slice()` with the same column for `walk_on` and `slice_on`, shapeshiftr:
+
+1. **Walks** through each time point in your data (controlled by `walk_on`)
+2. **Slices** backward (or forward) in time from that point (controlled by `slice_on`)
+3. **Extracts** values at the specified lag positions (controlled by `L`)
+
+The result is a set of lag features properly aligned with each time point.
+
+### Example 1: Single Lag (AR(1) Model)
+
+Let's start with the simplest case: creating a single lag feature for forecasting.
+This represents an AR(1) autoregressive model where tomorrow's value is predicted
+using today's value.
+
+```{r simple-lag-1}
+data(simple_dt_date)
+
+lag_1 <- slice(
+    simple_dt_date,
+    variables = "Y",
+    walk_on = "date",
+    slice_on = "date",
+    L = c(-1)
+)
+
+ar1_data <- as.data.table(lag_1)
+head(ar1_data)
+```
+
+**Key observations**:
+
+- The `walk_on` and `slice_on` are both `"date"` - this is simple slicing
+- `L = c(-1)` creates a 1-day lag of variable `Y` (negative = past values)
+- The result has columns: `index` (the date), `Y_1` (lag 1 of Y), and `Y` (the target)
+- First row has `NA` for `Y_1` (no previous value exists)
+- Each subsequent row contains yesterday's `Y` value as `Y_1`
+
+This dataset is immediately ready for fitting an AR(1) model:
+`Y ~ Y_1`
+
+### Example 2: Multiple Lags (AR(3) Model)
+
+For richer temporal patterns, we often need multiple lags. An AR(3) model uses
+the past 3 values to predict the next value.
+
+```{r simple-lag-3}
+lag_3 <- slice(
+    simple_dt_date,
+    variables = "Y",
+    walk_on = "date",
+    slice_on = "date",
+    L = c(-1, -2, -3)
+)
+
+ar3_data <- as.data.table(lag_3)
+head(ar3_data)
+```
+
+**Key observations**:
+
+- `L = c(-1, -2, -3)` creates lags 1, 2, and 3 simultaneously
+- Result has: `index`, `Y_1`, `Y_2`, `Y_3`, `Y`
+- First 3 rows have progressively more `NA` values
+- Row 4 onward has complete lag features
+
+This pattern extends naturally: `L = c(-1, -2, -3, -4, -5, -6, -7)` would create a
+week of lags for daily data.
+
+### Example 3: Multiple Variables with Different Lags
+
+Real forecasting scenarios involve multiple predictors with different lag structures.
+You might want:
+
+- 3 lags of the target variable `Y`
+- 7 lags of exogenous variable `X1` (a week of history)
+- Selected lags of `X2` (perhaps 1, 3, and 7 days)
+
+```{r simple-multi-var}
+multi_var <- slice(
+    simple_dt_date,
+    variables = c("Y", "X1", "X2"),
+    walk_on = "date",
+    slice_on = "date",
+    L = list(
+        Y = c(-1, -2, -3),
+        X1 = c(-1, -2, -3, -4, -5, -6, -7),
+        X2 = c(-1, -3, -7)
+    )
+)
+
+multi_data <- as.data.table(multi_var)
+tail(multi_data, 3)
+
+# Column names:
+print(names(multi_data))
+```
+
+**Key observations**:
+
+- Each variable can have a different lag structure specified in the list
+- `Y` gets 3 lag columns: `Y_1`, `Y_2`, `Y_3`
+- `X1` gets 7 lag columns: `X1_1` through `X1_7`
+- `X2` gets 3 selected lag columns: `X2_1`, `X2_3`, `X2_7`
+- The result is a rich feature matrix with 13 lag features plus target
+- All features are properly aligned by date (in the `index` column)
+
+This demonstrates the power of simple slicing: a single `slice()` call creates
+a complete autoregressive feature matrix that would require extensive manual
+coding otherwise.
+
+### Key Takeaways
+
+**Simple slicing** (`walk_on == slice_on`) is characterized by:
+
+- Creating lag features from the same temporal index
+- Progressive complexity: single lag → multiple lags → multiple variables
+- List format for `L` parameter allows different lags per variable
+- Results are immediately model-ready for autoregressive forecasting
+- Proper handling of missing values at temporal boundaries
+
+**IMPORTANT!!**
+
+The suffixes `_1`, `_2`, DO NOT correspond to the actual `L` values directly. They are simply
+numbered in along the values provided, existing only for ordering purposes. Take the `L` values for
+`X2` in the above example: `c(-1, -3, -7)`. The resulting columns are named
+`X2_1`, `X2_2`, and `X2_3`, which should be read as "first `L` value", "second `L` value", and so
+on, not "lag 1", "lag 2", etc.
+
+
+## Keyed Slicing
+
+**Keyed slicing** occurs when you walk on one temporal index but slice on a different
+temporal index. This enables integration of data sources with different temporal
+resolutions or structures with one caveat: both indexes must be of the same type! This means both
+columns must be date-based, datetime-based, or integer-based.
+
+The defining characteristic is: **`walk_on != slice_on`**
+
+Common use cases include:
+
+- Daily forecasts using hourly weather data
+- Monthly predictions using daily transaction data
+- Integrating forecast/exogenous variables with different granularity
+
+### Concept: Walking and Slicing on Different Indices
+
+When `walk_on` and `slice_on` differ, shapeshiftr:
+
+1. **Walks** through the time points defined by `walk_on`
+2. **Slices** from the temporal index defined by `slice_on`
+3. **Aligns** the two indices to extract relevant features
+
+This allows you to "reach into" a finer-grained temporal structure while maintaining
+a coarser prediction schedule.
+
+### Example 1: Basic Keyed Slicing
+
+Imagine you're forecasting daily outcomes but have access to hourly weather forecasts.
+You want to integrate the next 24 hours of forecasted temperature as features for
+each daily prediction.
+
+For this example, we'll use a half-hourly dataset and create features for the next 2 hours:
+
+```{r keyed-basic}
+data(keyed_dt_datetime)
+
+# Half-hourly forecast data structure:
+
+print(head(keyed_dt_datetime, 15))
+
+keyed_slice <- slice(
+    keyed_dt_datetime,
+    variables = "Y",
+    walk_on = "datetime",
+    slice_on = "target_datetime",
+    L = 0:4
+)
+
+keyed_data <- as.data.table(keyed_slice)
+
+# Keyed slice result (first 2 hours ahead):
+
+print(head(keyed_data, 2))
+
+# Column structure:
+
+print(names(keyed_data))
+# 5 half-hourly features total)
+```
+
+**Key observations**:
+
+- `walk_on = "datetime"` defines half-hourly time points for predictions
+- `slice_on = "target_datetime"` reaches into half-hourly temporal structure
+- Positive `L` values create features for future time periods
+- `L = 0:4` extracts values at current time (0) and next 4 half-hours
+- Result has one row per half-hour with 5 half-hourly features
+
+This is particularly useful when integrating external forecasts or planned
+interventions into your forecasting model.
+
+### Understanding the Walk-Slice Relationship
+
+The key to keyed slicing is understanding how `walk_on` and `slice_on` interact:
+
+```
+Hourly walk points (walk_on = "date"):
+
+  2025-01-01 01:00      |   2025-01-01 02:00     |   2025-01-01 03:00
+                        
+           |            |            |           |            |
+           v            |            v           |            v
+
+Half-hourly slice points| (slice_on = "datetime")|:
+
+  01:00 01:00 ... 03:00 | 02:00 02:30 ... 04:00  | 03:00 03:30 ... 05:00
+  <---- 2 hours ------> | <---- 2 hours ------>  | <---- 2 hours ------>  
+```
+
+When you specify `L = list(Y = 0:4)`, shapeshiftr:
+
+1. Starts at each hourly walk point (2025-01-01 01:00, 2025-01-01 02:00, ...)
+2. Check what is the resolution of `slice_on` (`target_datetime` is half-hourly)
+3. Compute what are the time steps for `L` values (0-4) *in `target_datetime`'s resolution*
+   - 0 = current half-hour
+   - 1 = next half-hour
+   - 2 = two half-hours ahead
+   - 3 = three half-hours ahead
+   - 4 = four half-hours ahead
+4. Finds corresponding datetime in the half-hourly `target_datetime`
+5. Creates features `Y_0` through `Y_4`
+
+### Key Takeaways
+
+**Keyed slicing** (`walk_on != slice_on`) is characterized by:
+
+- Integrating data with different temporal resolutions
+- Walking on prediction schedule, slicing on data schedule
+- Enables incorporation of forecast/exogenous data
+- Proper temporal alignment between different granularities
+
+Keyed slicing complements simple slicing: use simple slicing for lag or lead features of
+your target and predictors when there is only one temporal index; use keyed slicing to integrate
+external data sources with different temporal structures.
+
+## Building Model-Ready Datasets
+
+Now that you understand simple slicing (Section 2) and keyed slicing (Section 3),
+let's integrate these concepts into a complete workflow for building model-ready
+forecasting datasets.
+
+This section demonstrates the **essential workflow functions**:
+
+- **`merge.slice_artifact()`** - Combine multiple slice results
+- **`as.data.table.slice_artifact()`** - Convert to final data.table
+
+These functions transform slice objects into the wide-format data.tables that
+modeling functions expect.
+
+### The Complete Workflow
+
+A typical forecasting workflow involves:
+
+1. **Create multiple slices** for different variable groups or lag structures
+2. **Merge slice artifacts** to integrate all features
+3. **Convert to data.table** for modeling
+
+Let's build a comprehensive forecasting dataset that predicts the day after tomorrow's `Y` (i.e. 
+two days ahead) using:
+
+- 3-day lags of target variable `Y` (simple slicing)
+- 3-day lags of predictors `X1` and `X2` (simple slicing)
+- 2-day leads of forecasted predictors `X1` and `X2` (keyed slicing)
+- Categorical features from current day
+
+To avoid confusion between past and future features, we'll make use of the argument `names` of 
+`slice()` to clearly label features.
+
+```{r workflow-complete}
+data(simple_dt_date)
+data(keyed_dt_date)
+
+# ======================================================================
+# STEP 1: CREATE LAG FEATURES (Simple Slicing)
+# ======================================================================
+
+lags <- slice(
+    simple_dt_date,
+    variables = c("X1", "X2", "Y"),
+    walk_on = "date",
+    slice_on = "date",
+    L = list(
+        X1 = -seq(3),
+        X2 = -seq(3),
+        Y = -seq(3)
+    ),
+    names = list(
+        X1 = "X1_lag",
+        X2 = "X2_lag",
+        Y = "Y_lag"
+    )
+)
+
+# Created a slice_artifact object containing 3-day lags of target variable Y and predictors X1 and X2
+# Structure of lags:
+
+print(str(lags, max.level = 1))
+
+# ======================================================================
+# STEP 2: CREATE LEAD FEATURES (Keyed Slicing)
+# ======================================================================
+
+leads <- slice(
+    keyed_dt_date,
+    variables = c("X1", "X2"),
+    walk_on = "date",
+    slice_on = "target_date",
+    L = list(
+        X1 = seq(2),
+        X2 = seq(2)
+    ),
+    names = list(
+        X1 = "X1_lead",
+        X2 = "X2_lead"
+    )
+)
+
+# Created a slice_artifact object containing 2-day leads of predictors X1 and X2
+# Structure of lead
+
+print(str(leads, max.level = 1))
+
+# ======================================================================
+# STEP 3: MERGE SLICE ARTIFACTS (merge.slice_artifact)
+# ======================================================================
+
+# ** This is merge.slice_artifact() **
+
+# Purpose:
+#   Combine multiple slice_artifact objects based on temporal alignment.
+#   This integrates features from different slicing operations while
+#   maintaining proper temporal relationships.
+
+all_predictors <- merge(lags, leads)
+
+# Operation: merge(lags, leads)
+
+# Result:
+#   - Contains features from BOTH slice_artifacts
+#   - Y lags from lags: Y_lag_1, Y_lag_2, Y_lag_3
+#   - X lags from lags: X1_lag_1, X1_lag_2, X1_lag_3, X2_lag_1, X2_lag_2, X2_lag_3
+#   - X leads from leads: X1_lead_1, X1_lead_2, X2_lead_1, X2_lead_2
+#   - All features temporally aligned by index
+
+# Structure of merged slice_artifact:
+print(str(all_predictors, max.level = 2))
+
+
+# ======================================================================
+# STEP 4: CONVERT TO MODEL-READY DATA.TABLE (as.data.table.slice_artifact)
+# ======================================================================
+
+# ** This is as.data.table.slice_artifact() **
+
+# Purpose:
+#   Convert slice_artifact to wide-format data.table for modeling.
+#   This is the final step that produces a dataset ready for lm()
+#   glm(), randomForest(), xgboost, or any other modeling function.
+
+model_data <- as.data.table(all_predictors)
+
+# Conversion complete!\n
+
+# Dimensions:", nrow(model_data), "rows ×", ncol(model_data), "columns
+
+# Model-ready dataset (first 6 rows):
+
+print(head(model_data, 6))
+
+# Column structure:
+print(names(model_data))
+
+# Summary of key features:
+print(summary(model_data[, .SD, .SDcols = -1]))
+
+
+# ======================================================================
+# VERIFICATION: THIS DATASET IS MODEL-READY
+# ======================================================================
+
+# ✓ This dataset can be used directly in modeling:
+
+#   # Linear regression example:
+#   model <- lm(Y ~ Y_lag_1 + Y_lag_2 + Y_lag_3 + X1_lag_1 + X1_lag_2 + X1_lag_3 +
+#                   X2_lag_1 + X2_lag_2 + X2_lag_3, data = model_data)
+
+#   # Or using formula shorthand:
+#   model <- lm(Y ~ ., data = model_data[, -'index'])
+
+#   # Generate predictions:
+#   predictions <- predict(model, newdata = test_data)
+
+# Key characteristics of model-ready data:
+#   - Each row: A prediction task (one time point)
+#   - Lag columns: Features (predictors)
+#   - Y column: Target variable
+#   - index column: Time index for tracking
+
+# Rows with complete cases:
+
+sum(complete.cases(model_data))
+
+print(nrow(model_data))
+```
+
+### Workflow Summary
+
+The three-step workflow is:
+
+```r
+slice() → merge() → as.data.table()
+```
+
+**Step 1: `slice()`** - Create temporal features
+
+- Use simple slicing for lag features (`walk_on == slice_on`)
+- Use keyed slicing for external data (`walk_on != slice_on`)
+- Create separate slices for different variable groups
+
+**Step 2: `merge.slice_artifact()`** - Integrate multiple slices
+
+- Combines slice_artifact objects with temporal alignment
+- Essential for integrating different feature groups
+- Maintains proper temporal relationships across all features
+
+**Step 3: `as.data.table.slice_artifact()`** - Final conversion
+
+- Transforms slice_artifact to wide-format data.table
+- Produces immediately model-ready dataset
+- Standard tabular format works with any modeling framework
+
+### Key Takeaways
+
+**Building model-ready datasets** requires understanding:
+
+- **`slice()`** creates temporal features (covered in Sections 2-3)
+- **`merge.slice_artifact()`** integrates multiple slice results
+- **`as.data.table.slice_artifact()`** produces final modeling dataset
+
+**Workflow patterns**:
+
+- Create multiple slices for different variable groups
+- Merge slices to combine all features
+- Convert to data.table as final step
+- Result is wide-format, model-ready data
+
+**Best practices**:
+
+- Keep related variables in the same slice when possible
+- Use `merge()` to combine slices with proper temporal alignment
+- Always verify temporal alignment after merging
+- Check for complete cases before modeling
+
+This workflow forms the foundation for all temporal feature engineering in
+shapeshiftr. Sections 5-8 (future sprints) will cover advanced patterns,
+missing value strategies, and production deployment.

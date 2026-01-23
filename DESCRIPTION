@@ -19,5 +19,8 @@ RoxygenNote: 7.3.3
 LazyData: true
 Suggests: 
     testthat (>= 3.0.0),
-    parallel (>= 4.3.0)
+    parallel (>= 4.3.0),
+    knitr (>= 1.40),
+    rmarkdown (>= 2.20)
+VignetteBuilder: knitr
 Config/testthat/edition: 3

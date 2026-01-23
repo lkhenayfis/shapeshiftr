@@ -2,3 +2,5 @@ informals/
 profiling/
 .Renviron
 .vscode/
+/doc/
+/Meta/
