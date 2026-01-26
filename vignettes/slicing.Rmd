@@ -363,7 +363,6 @@ two days ahead) using:
 - 3-day lags of target variable `Y` (simple slicing)
 - 3-day lags of predictors `X1` and `X2` (simple slicing)
 - 2-day leads of forecasted predictors `X1` and `X2` (keyed slicing)
-- Categorical features from current day
 
 To avoid confusion between past and future features, we'll make use of the argument `names` of 
 `slice()` to clearly label features.
@@ -554,5 +553,302 @@ slice() → merge() → as.data.table()
 - Check for complete cases before modeling
 
 This workflow forms the foundation for all temporal feature engineering in
-shapeshiftr. Sections 5-8 (future sprints) will cover advanced patterns,
-missing value strategies, and production deployment.
+shapeshiftr. Sections 5-8 build on this foundation with advanced concepts
+and complete production-ready examples.
+
+
+## The slice_artifact Object
+
+`slice()` returns a `slice_artifact` object — a specialized S3 class designed for holding the
+temporal slices along some relevant attributes of the slicing. Understanding this structure helps
+you inspect, debug, and manipulate slicing results.
+
+This section covers:
+
+- Internal structure (list of lists)
+- Key attributes
+- Inspection methods
+- Subsetting and conversion
+
+### Structure Inspection
+
+A `slice_artifact` is fundamentally a list of lists: 
+
+1. First level corresponds to variables included in the slicing
+2. Second level, elements within a variable, correspond to temporal windows
+
+Let's examine its internal structure:
+
+```{r slice-artifact-structure}
+data(simple_dt_date)
+
+sliced <- slice(
+    simple_dt_date,
+    walk_on = "date",
+    slice_on = "date",
+    variables = c("X1", "Y"),
+    L = c(-1, -2, -3)
+)
+
+# List of 2 elements named X1 and Y, each of which is a list
+
+str(sliced, max.level = 1)
+
+# Detailed view of this element
+
+str(sliced$Y, max.level = 2)
+
+# Check attributes
+attributes(sliced)
+# Key attributes:
+#   - class: "slice_artifact" 
+#   - index: temporal index values from `walk_on`
+#   - L: temporal offset values from `L` in the time frequency of `slice_on` (possibly a list if multiple variables)
+```
+
+### Basic Methods
+
+The `slice_artifact` class has several S3 methods that provide a familiar interface, beyond the
+`merge()` and `as.data.table()` methods covered earlier. These include:
+
+1. `names()`: Simple getter for variable names
+2. `dim()`: Dimensions of the slice_artifact (number of time indexes, number of features)
+3. `[`: Subsetting operator that maintains `slice_artifact` class
+4. `c()`: Concatenation of multiple `slice_artifact` objects 
+
+`names()` and `dim()` are very self explanatory, but the other two are worth demonstrating. Let's
+start with subsetting. `[.slice_artifact` allows for subsetting in "two dimensions": variables and
+time indexes through arguments `i` and `j`, respectively.
+
+Both can either be numeric, in which case it is assumed indexes of the variables or time indexes.
+Alternatively, `i` can be character vector of variable names, and `j` can be a vector of temporal
+index values.
+
+```{r slice-artifact-subset}
+data(simple_dt_date)
+
+sliced <- slice(
+    simple_dt_date,
+    walk_on = "date",
+    slice_on = "date",
+    variables = c("X1", "Y"),
+    L = c(-1, -2, -3)
+)
+
+# Subsetting variables with numeric
+sliced_X1 <- sliced[1]
+dim(sliced_X1)
+str(sliced_X1, max.level = 2)
+
+# Subsetting variables with name
+sliced_Y <- sliced["Y"]
+dim(sliced_Y)
+str(sliced_Y, max.level = 2)
+
+# Subsetting times with numeric
+sliced_times_1_10 <- sliced[, 1:10]
+dim(sliced_times_1_10)
+str(sliced_times_1_10, max.level = 2)
+
+# Subsetting both dimensions
+times <- seq.Date(as.Date("2025-01-02"), as.Date("2025-01-20"), by = "3 days")
+sliced_Y_times <- sliced["Y", times]
+dim(sliced_Y_times)
+str(sliced_Y_times, max.level = 2)
+```
+
+As for concatenating, it works simialrly to base `c()` on vectors or lists, but by variable within
+the slices. To do so it requires a few conditions to be met. First, all slices in the concatenation
+must include the same variables. Second, all slices must have the same `L` structure.
+`c.slice_artifact` does not "pad" missing variables or different `L` structures because this would
+lead to an object that is inherently not a coherent slice artifact.
+
+```{r slice-artifact-concat}
+data(simple_dt_date)
+
+sliced_full <- slice(
+    simple_dt_date,
+    walk_on = "date",
+    slice_on = "date",
+    variables = c("X1", "Y"),
+    L = c(-1, -2, -3)
+)
+
+sliced_1 <- slice(
+    head(simple_dt_date, 10),
+    walk_on = "date",
+    slice_on = "date",
+    variables = c("X1", "Y"),
+    L = c(-1, -2, -3)
+)
+
+sliced_2 <- slice(
+    tail(simple_dt_date, 13), # extra samples so that the first slices here don't have NA
+    start = 4,
+    walk_on = "date",
+    slice_on = "date",
+    variables = c("X1", "Y"),
+    L = c(-1, -2, -3)
+)
+
+# Concatenation when everything is coherent
+sliced_concat <- c(sliced_1, sliced_2)
+identical(sliced_concat, sliced_full)
+
+# Attempting concatenation when there is a mismatch
+sliced_concat_error <- try(c(sliced_1, sliced_2["Y"]), silent = TRUE)
+print(sliced_concat_error)
+```
+
+### Understanding Attributes
+
+`slice_artifact` objects have two unique attributes: `index` and `L`.
+
+```{r slice-artifact-attributes}
+
+sliced <- slice(
+    simple_dt_date,
+    walk_on = "date",
+    slice_on = "date",
+    variables = c("X1", "Y"),
+    L = c(-1, -2, -3)
+)
+
+# Extract specific attributes
+slice_index <- attr(sliced, "index")
+slice_L <- attr(sliced, "L")
+
+# The index attribute maintains temporal alignment
+# Contains the temporal at which walk_on was visited and from which lags and leads are computed
+head(slice_index)
+
+# Shows the L specification for each variable in the sampling frequency of slice_on
+# In this case it is the same as when we provided it to slice()
+print(slice_L)
+
+# Notice what happens when we slice on a POSIX column
+sliced_datetime <- slice(
+    keyed_dt_datetime,
+    walk_on = "datetime",
+    slice_on = "target_datetime",
+    variables = c("X1", "Y"),
+    L = c(-2, -1, 0, 1, 2)
+)
+
+sliced_datetime_L <- attr(sliced_datetime, "L")
+print(sliced_datetime_L)
+
+# Values appear multiplied by 1800 seconds (30 minutes) because `target_datetime` is half-hourly
+```
+
+### Advanced methods
+
+Understanding the inner structure is rarely necessary for basic usage, but becomes valuable when
+debugging complex workflows or extending shapeshiftr functionality. This section goes over
+"advanced" methods of `slice_artifact`s and later how to add custom ones.
+
+Currently `shapeshiftr` ships with a few extensions of `stats` and `utils` generics to
+`slice_artifact` objects. There are not many, but they include:
+
+* `mean()`
+* `max()`
+* `min()`
+* `sd()`
+* `var()`
+* `quantile()`
+* `summary()`
+* `head()`
+* `tail()`
+
+All of them operate the exact same way, applying the respective function to each temporal window
+in each variable of the `slice_artifact` object.
+
+```{r advanced-methods}
+# Create a slice for demonstration
+data(simple_dt_date)
+
+lag_slice <- slice(
+    simple_dt_date,
+    walk_on = "date",
+    slice_on = "date",
+    variables = "Y",
+    L = c(-1, -2, -3)
+)
+
+# Each applies an aggregation to each temporal window
+
+lag_mean <- mean(lag_slice)
+str(lag_mean, 10)
+
+lag_max <- max(lag_slice)
+str(lag_max, 10)
+```
+
+Notice windows with NA values disappeared, meaning `sliced_means` only has 17 windows per variable 
+instead of the original 20. This is a forced behavior of these methods, which will be discussed in 
+more detail in the next section on extending `slice_artifact` with custom methods.
+
+### Extending slice_artifact with Custom Methods
+
+It is easy to extend `slice_artifact` with new S3 methods. The one caveat to take notice of is that
+`shapeshiftr` has internal mechanisms to use multithreading, so one implementing new methods one
+must be aware of this. All methods listed in the previous section make use of an internal function
+called `INNER_METHOD_RUN`:
+
+```{r methods-implementation, eval=FALSE}
+min.slice_artifact <- function(x, variables, ...) {
+    INNER_METHOD_RUN(x, variables, min, ...)
+}
+```
+
+`INNER_METHOD_RUN` handles the iteration over all temporal windows in all `variables`. When creating
+custom methods one must follow this pattern to ensure compatibility with the internal mechanisms of
+`shapeshiftr`. To ensure consistency among all methods, `INNER_METHOD_RUN` also handles NA values by
+excluding any temporal window that contains NA values prior to applying the function.
+
+```{r inner-method-run, eval=FALSE}
+INNER_METHOD_RUN <- function(x, variables, fun, ...) {
+    if (missing("variables")) variables <- names(x)
+
+    x <- na.exclude(x)
+    out <- lapply(x[variables], function(l) lapply(l, fun, ...))
+    out <- lapply(out, function(l) lapply(l, unname))
+
+    new_slice_artifact(out, attr(x, "index"), NA)
+}
+```
+
+### Understanding the Extension Pattern
+
+You can extend `slice_artifact` with custom methods using the `INNER_METHOD_RUN` 
+pattern. While we won't implement a full custom method in this vignette, 
+understanding the pattern is valuable for advanced users.
+
+```{r custom-method-pattern, eval=FALSE}
+# Pattern for creating custom aggregation methods
+# (This code is for illustration - not executed)
+
+# Define some function that applies a statistic to a vector of data
+f <- function(v, p) {
+    # Handle NA values
+    valid <- !is.na(v)
+    if (sum(valid) == 0) return(NA_real_)
+
+    # Your custom computation here
+    # Example: weighted sum
+    result <- sum(v[valid] * p[valid])
+    return(result)
+}
+
+# Define the S3 method for slice_artifact
+custom_stat.slice_artifact <- function(x, param = NULL, ...) {
+
+    # Use INNER_METHOD_RUN to apply to all windows
+    result <- INNER_METHOD_RUN(x, f, param = param, ...)
+
+    return(result)
+}
+
+# Call via the generic
+# result <- custom_stat(slice_artifact_object, param = weights)
+```
