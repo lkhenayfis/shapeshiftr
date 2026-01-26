@@ -9,6 +9,9 @@
 \arguments{
 \item{...}{variable number of \code{slice_artifact} objects}
 }
+\value{
+\code{slice_artifact} object resulting from concatenation
+}
 \description{
 Internal function; concatenates multiple objectes of this class into one \code{slice_artifact}
 }
@@ -19,4 +22,26 @@ conditions within the package and does not have all the necessary sanity checks 
 Mainly \code{c.slice_artifact} is intended to combine individual artifacts returned by
 \code{do_single_slice}, which are artifacts concerning a single time index, into the complete
 one for the whole original data
+}
+\examples{
+
+sliced_1 <- slice(
+    head(simple_dt_date, 10),
+    walk_on = "date",
+    slice_on = "date",
+    variables = c("X1", "Y"),
+    L = c(-1, -2, -3)
+)
+
+sliced_2 <- slice(
+    tail(simple_dt_date, 13), # extra samples so that the first slices here don't have NA
+    start = 4,
+    walk_on = "date",
+    slice_on = "date",
+    variables = c("X1", "Y"),
+    L = c(-1, -2, -3)
+)
+
+sliced_concat <- c(sliced_1, sliced_2)
+
 }

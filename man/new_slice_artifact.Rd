@@ -13,19 +13,20 @@ new_slice_artifact(list, index, L)
 
 \item{L}{the list of lag/leads used in extracting slices}
 }
+\value{
+object of class \code{slice_artifact}
+}
 \description{
 Builds an object of class \code{slice_artifact}
 }
-\section{The slice_artifact Class}{
-
-\subsection{Internal Structure}{
-
-A \code{slice_artifact} is a list of lists with the following structure:
+\details{
+The \code{slice_artifact} Class is essentially a list of lists
 
 \itemize{
-\item \strong{Outer list}: Named by variable names from original data
-\item \strong{Inner lists}: Named by lag/lead values (e.g., "L-1", "L-2", "L1")
-\item \strong{Vectors}: Each inner element contains the sliced values for that lag
+\item Outer list: each element corresponds to a variable that was sliced
+\item Inner lists: each element corresponds to a temporal index when slicing happened
+\item Vectors: each element corresponds to the value of the variable at the specified
+lag/lead at that window
 }
 
 For example, a slice of variable \code{Y} with lags -1, -2, -3:
@@ -33,12 +34,11 @@ For example, a slice of variable \code{Y} with lags -1, -2, -3:
 \preformatted{
 List of 1
  $ Y:List of 3
-  ..$ L-1: num [1:N] ...  # 1-period lag
-  ..$ L-2: num [1:N] ...  # 2-period lag
-  ..$ L-3: num [1:N] ...  # 3-period lag
+  ..$ 1: num [1:3] ...
+  ..$ 2: num [1:3] ...
+  ..$ ...
+  ..$ N: num [1:3] ...
 }
-}
-
 \subsection{Attributes}{
 
 Every \code{slice_artifact} has three attributes:
@@ -52,47 +52,7 @@ requested in the \code{slice()} call. Retained for reference and validation.}
 Enables S3 method dispatch.}
 }
 }
-
-\subsection{Available Methods}{
-
-The following S3 methods are available for \code{slice_artifact} objects:
-
-\tabular{ll}{
-\strong{Method} \tab \strong{Purpose} \cr
-\code{print} \tab Display summary of slice structure \cr
-\code{summary} \tab Detailed statistical summary of slices \cr
-\code{[} (subset) \tab Extract specific variables or lags \cr
-\code{merge} \tab Combine multiple slice artifacts \cr
-\code{as.data.table} \tab Convert to wide or long data.table format \cr
-\code{dwt} \tab Apply discrete wavelet transform \cr
-General methods \tab \code{mean}, \code{sd}, \code{var}, \code{quantile}, etc.
 }
-
-See individual method documentation for details: \code{\link{merge.slice_artifact}},
-\code{\link{as.data.table.slice_artifact}}, \code{\link{dwt.slice_artifact}}.
-}
-
-\subsection{Method Dispatch}{
-
-The \code{slice_artifact} class uses R's S3 object system. When you call a
-generic function on a slice_artifact, R looks for a method with the pattern
-\code{generic.slice_artifact}:
-
-\preformatted{
-obj <- slice(data, variables = "Y", walk_on = "date", L = -1:-3)
-
-# Calls print.slice_artifact()
-print(obj)
-
-# Calls summary.slice_artifact()
-summary(obj)
-
-# Calls mean.slice_artifact()
-mean(obj)
-}
-}
-}
-
 \examples{
 # Example 1: Inspecting slice_artifact structure ----
 # Understand the internal list-of-lists structure
@@ -116,23 +76,12 @@ attr(slices, "index")
 attr(slices, "L")
 class(slices)
 
-# Access individual components
-slices$Y$`L-1`
-slices[["X1"]][["L-2"]]
-
-# Example 2: Method dispatch for slice_artifact ----
-# Generic functions automatically use slice_artifact methods
-
-# Print method: Calls print.slice_artifact()
-print(slices)
-
-# Summary method: Calls summary.slice_artifact()
-summary(slices)
-
-# Statistical methods: Call generic.slice_artifact()
-mean(slices)
-sd(slices)
-
 # Check what methods are available
 methods(class = "slice_artifact")
+
+}
+\seealso{
+\code{names.slice_artifact()}, \code{dim.slice_artifact()}, \code{c.slice_artifact()},
+\verb{[.slice_artifact()}, \code{merge.slice_artifact()}, \code{as.data.table.slice_artifact()} and
+\code{combine_features()}
 }

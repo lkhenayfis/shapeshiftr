@@ -15,10 +15,45 @@
 
 \item{...}{has no utility other than consistency with the generic}
 }
+\value{
+\code{slice_artifact} object resulting from subsetting
+}
 \description{
 Internal function; subsets \code{slice_artifact} either by variable or index
 }
 \details{
 This function is not intended to be directly called by the user. It is only deployed in specific
 conditions within the package and does not have all the necessary sanity checks for external use.
+}
+\examples{
+
+sliced <- slice(
+    simple_dt_date,
+    walk_on = "date",
+    slice_on = "date",
+    variables = c("X1", "Y"),
+    L = c(-1, -2, -3)
+)
+
+# Subsetting variables with numeric
+sliced_X1 <- sliced[1]
+dim(sliced_X1)
+str(sliced_X1, max.level = 2)
+
+# Subsetting variables with name
+sliced_Y <- sliced["Y"]
+dim(sliced_Y)
+str(sliced_Y, max.level = 2)
+
+# Subsetting times with numeric
+sliced_times_1_10 <- sliced[, 1:10]
+dim(sliced_times_1_10)
+str(sliced_times_1_10, max.level = 2)
+
+# Subsetting both dimensions
+times <- seq.Date(as.Date("2025-01-02"), as.Date("2025-01-20"), by = "3 days")
+sliced_Y_times <- sliced["Y", times]
+dim(sliced_Y_times)
+str(sliced_Y_times, max.level = 2)
+
 }
