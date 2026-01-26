@@ -14,7 +14,7 @@ eval_pipes(pipes, env = parent.frame(), enclos = parent.frame())
 \item{enclos}{enclosing environment for evaluation of the closures}
 }
 \value{
-single data.table combining the results of applying all pipes in \code{pipes}
+list of results from applying each pipe to its defined data
 }
 \description{
 Simple wrapper for looping \code{eval_single_pipe} over multiple pipes

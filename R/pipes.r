@@ -288,7 +288,7 @@ parse_pipes <- function(raw_pipes, env = parent.frame(), enclos = parent.frame()
 #' **Recommended Workflow with Named Lists**:
 #' \preformatted{
 #' # 1. Create named list with training data
-#' data_list <- list(data = train_data)
+#' data_list_train <- list(data = train_data)
 #'
 #' # 2. Define raw pipe referencing list element
 #' raw_pipe <- list(
@@ -297,16 +297,16 @@ parse_pipes <- function(raw_pipes, env = parent.frame(), enclos = parent.frame()
 #' )
 #'
 #' # 3. Parse on train: learn parameters
-#' parsed <- parse_single_pipe(raw_pipe, env = data_list)
+#' parsed <- parse_single_pipe(raw_pipe, env = data_list_train)
 #'
 #' # 4. Eval on train: transform with learned params
-#' train_result <- eval_single_pipe(parsed, env = data_list)
+#' train_result <- eval_single_pipe(parsed, env = data_list_train)
 #'
-#' # 5. Swap data in environment
-#' data_list$data <- test_data
+#' # 5. Define a test set of data
+#' data_list_test <- list(data = test_data)
 #'
 #' # 6. Eval on test: SAME params, different data
-#' test_result <- eval_single_pipe(parsed, env = data_list)
+#' test_result <- eval_single_pipe(parsed, env = data_list_test)
 #' }
 #'
 #' This pattern enables easy data swapping without modifying the pipe structure.
@@ -353,12 +353,12 @@ parse_pipes <- function(raw_pipes, env = parent.frame(), enclos = parent.frame()
 #'
 #' library(data.table)
 #' data(simple_dt_date)
-#'
+#' 
 #' # Define closure generator for standardization (same as parse_single_pipe Example 3)
 #' gen_standardize <- function(cols, x, ...) {
 #'     train_means <- colMeans(x[, ..cols], na.rm = TRUE)
 #'     train_sds <- apply(x[, ..cols], 2, sd, na.rm = TRUE)
-#'
+#' 
 #'     function(x) {
 #'         x_copy <- copy(x)
 #'         for (col in cols) {
@@ -367,10 +367,10 @@ parse_pipes <- function(raw_pipes, env = parent.frame(), enclos = parent.frame()
 #'         return(x_copy)
 #'     }
 #' }
-#'
+#' 
 #' # Create named list containing data (recommended pattern)
-#' data_list <- list(data = simple_dt_date)
-#'
+#' data_list_train <- list(data = simple_dt_date)
+#' 
 #' # Define raw pipe using reference to list element
 #' raw_pipe <- list(
 #'     on = "data",
@@ -378,31 +378,32 @@ parse_pipes <- function(raw_pipes, env = parent.frame(), enclos = parent.frame()
 #'         list(fun = "gen_standardize", cols = c("X1", "X2", "Y"))
 #'     )
 #' )
-#'
+#' 
 #' # PARSE: Learn parameters from data
-#' parsed <- parse_single_pipe(raw_pipe, env = data_list)
-#'
+#' parsed <- parse_single_pipe(raw_pipe, env = data_list_train)
+#' 
 #' # EVAL: Apply learned transformation
-#' result <- eval_single_pipe(parsed, env = data_list)
-#'
+#' result <- eval_single_pipe(parsed, env = data_list_train)
+#' 
 #' # Verify standardization
 #' cat("Column X1 - Mean:", mean(result$X1), "SD:", sd(result$X1), "\n")
 #' cat("Column X2 - Mean:", mean(result$X2), "SD:", sd(result$X2), "\n")
 #' cat("Column Y - Mean:", mean(result$Y), "SD:", sd(result$Y), "\n")
-#'
+#' 
 #' # Example 2: Train-test consistency - CORE USE CASE AND PRIMARY VALUE PROPOSITION ---------------
+#' 
 #' # This example demonstrates the PRIMARY PURPOSE of the parse-eval separation:
 #' # ensuring transformations use TRAINING parameters on both train and test data.
 #' # This prevents data leakage and maintains statistical validity.
-#'
+#' 
 #' library(data.table)
 #' data(simple_dt_date)
-#'
+#' 
 #' # Define closure generator (same as Example 1)
 #' gen_standardize <- function(cols, x, ...) {
 #'     train_means <- colMeans(x[, ..cols], na.rm = TRUE)
 #'     train_sds <- apply(x[, ..cols], 2, sd, na.rm = TRUE)
-#'
+#' 
 #'     function(x) {
 #'         x_copy <- copy(x)
 #'         for (col in cols) {
@@ -411,14 +412,14 @@ parse_pipes <- function(raw_pipes, env = parent.frame(), enclos = parent.frame()
 #'         return(x_copy)
 #'     }
 #' }
-#'
+#' 
 #' # STEP 1: Split data into train and test sets
 #' train_data <- simple_dt_date[1:15]
 #' test_data <- simple_dt_date[16:20]
-#'
+#' 
 #' # Create named list with training data
-#' data_list <- list(data = train_data)
-#'
+#' data_list_train <- list(data = train_data)
+#' 
 #' # Define raw pipe
 #' raw_pipe <- list(
 #'     on = "data",
@@ -426,64 +427,69 @@ parse_pipes <- function(raw_pipes, env = parent.frame(), enclos = parent.frame()
 #'         list(fun = "gen_standardize", cols = c("X1", "X2"))
 #'     )
 #' )
-#'
+#' 
 #' # STEP 2: PARSE on training data - Learn parameters (mean, sd) from train set
-#' parsed <- parse_single_pipe(raw_pipe, env = data_list)
-#'
+#' parsed <- parse_single_pipe(raw_pipe, env = data_list_train)
+#' 
 #' # Extract and print captured training parameters for verification
 #' closure <- parsed$transforms[[1]]
 #' closure_env <- environment(closure)
 #' train_means <- get("train_means", closure_env)
 #' train_sds <- get("train_sds", closure_env)
-#'
+#' 
 #' cat("\n=== CAPTURED TRAINING PARAMETERS ===\n")
 #' cat("Training mean X1:", train_means["X1"], "\n")
 #' cat("Training sd X1:", train_sds["X1"], "\n")
 #' cat("Training mean X2:", train_means["X2"], "\n")
 #' cat("Training sd X2:", train_sds["X2"], "\n")
-#'
+#' 
 #' # STEP 3: EVAL on training data - Apply transformation to train set
-#' train_result <- eval_single_pipe(parsed, env = data_list)
-#'
+#' train_result <- eval_single_pipe(parsed, env = data_list_train)
+#' 
 #' cat("\n=== TRAINING SET TRANSFORMATION ===\n")
 #' cat("Train X1 - Mean:", round(mean(train_result$X1), 10), "SD:", round(sd(train_result$X1), 6), "\n")
 #' cat("Train X2 - Mean:", round(mean(train_result$X2), 10), "SD:", round(sd(train_result$X2), 6), "\n")
 #' cat("(Should be mean ≈ 0, sd ≈ 1 because we used training params on training data)\n")
-#'
+#' 
 #' # STEP 4: EVAL on test data - Swap data in environment, apply SAME transformation
 #' # This is THE KEY STEP: we use the SAME parsed pipe (with training parameters)
 #' # but evaluate on different data
-#' data_list$data <- test_data
-#' test_result <- eval_single_pipe(parsed, env = data_list)
-#'
+#' data_list_test <- list(data = test_data)
+#' test_result <- eval_single_pipe(parsed, env = data_list_test)
+#' 
 #' cat("\n=== TEST SET TRANSFORMATION ===\n")
 #' cat("Test X1 - Mean:", round(mean(test_result$X1), 6), "SD:", round(sd(test_result$X1), 6), "\n")
 #' cat("Test X2 - Mean:", round(mean(test_result$X2), 6), "SD:", round(sd(test_result$X2), 6), "\n")
 #' cat("(Mean ≠ 0, sd ≠ 1 because we used TRAINING params, not test params)\n")
-#'
+#' 
 #' # PROOF: Verify test transformation used TRAINING parameters, not test parameters
 #' cat("\n=== PROOF OF TRAIN-TEST CONSISTENCY ===\n")
 #' cat("Test data raw statistics:\n")
 #' cat("  Test X1 mean (raw):", round(mean(test_data$X1), 6), "\n")
 #' cat("  Test X1 sd (raw):", round(sd(test_data$X1), 6), "\n")
-#'
+#' 
 #' cat("\nManual verification (using TRAINING params):\n")
 #' manual_transform <- (test_data$X1 - train_means["X1"]) / train_sds["X1"]
 #' cat("  Manual transform mean:", round(mean(manual_transform), 6), "\n")
 #' cat("  eval_single_pipe mean:", round(mean(test_result$X1), 6), "\n")
 #' cat("  Match:", all.equal(manual_transform, test_result$X1), "\n")
-#'
+#' 
 #' cat("\nWhy this matters:\n")
 #' cat("  - Prevents data leakage (test stats don't influence transformation)\n")
 #' cat("  - Ensures reproducibility (same params in production)\n")
 #' cat("  - Maintains statistical validity (test is truly held-out)\n")
-#'
+#' 
 #' # Example 3: Stacking multiple transformations --------------------------------------------------
+#' 
 #' # Demonstrates chaining transformations while maintaining train-test consistency
-#'
+#' 
 #' library(data.table)
 #' data(simple_dt_date)
-#'
+#' 
+#' # modify data to ensure positive values for log transform
+#' simple_dt_date[, X1 := X1 + abs(min(X1)) + 1]
+#' simple_dt_date[, X2 := X2 + abs(min(X2)) + 1]
+#' 
 #' # Define stateless log transformation
 #' gen_log_transform <- function(cols, offset = 1, ...) {
 #'     function(x) {
@@ -494,12 +500,12 @@ parse_pipes <- function(raw_pipes, env = parent.frame(), enclos = parent.frame()
 #'         return(x_copy)
 #'     }
 #' }
-#'
+#' 
 #' # Define trainable standardization (same as previous examples)
 #' gen_standardize <- function(cols, x, ...) {
 #'     train_means <- colMeans(x[, ..cols], na.rm = TRUE)
 #'     train_sds <- apply(x[, ..cols], 2, sd, na.rm = TRUE)
-#'
+#' 
 #'     function(x) {
 #'         x_copy <- copy(x)
 #'         for (col in cols) {
@@ -508,12 +514,12 @@ parse_pipes <- function(raw_pipes, env = parent.frame(), enclos = parent.frame()
 #'         return(x_copy)
 #'     }
 #' }
-#'
+#' 
 #' # Split data
 #' train_data <- simple_dt_date[1:15]
 #' test_data <- simple_dt_date[16:20]
-#' data_list <- list(data = train_data)
-#'
+#' data_list_train <- list(data = train_data)
+#' 
 #' # Define stacked transformations: first log, then standardize
 #' raw_pipe <- list(
 #'     on = "data",
@@ -522,31 +528,31 @@ parse_pipes <- function(raw_pipes, env = parent.frame(), enclos = parent.frame()
 #'         list(fun = "gen_standardize", cols = c("X1", "X2"))
 #'     )
 #' )
-#'
+#' 
 #' # Parse on training data (learns standardization params from log-transformed train data)
-#' parsed <- parse_single_pipe(raw_pipe, env = data_list)
-#'
+#' parsed <- parse_single_pipe(raw_pipe, env = data_list_train)
+#' 
 #' # Apply to training data
-#' train_result <- eval_single_pipe(parsed, env = data_list)
+#' train_result <- eval_single_pipe(parsed, env = data_list_train)
 #' cat("Train after stacked transforms - X1 mean:", round(mean(train_result$X1), 10), "\n")
-#'
+#' 
 #' # Apply to test data with same parameters
-#' data_list$data <- test_data
-#' test_result <- eval_single_pipe(parsed, env = data_list)
+#' data_list_test <- list(data = test_data)
+#' test_result <- eval_single_pipe(parsed, env = data_list_test)
 #' cat("Test after stacked transforms - X1 mean:", round(mean(test_result$X1), 6), "\n")
 #' cat("(Both transformations maintain consistency: same log offset, same train mean/sd)\n")
-#'
+#' 
 #' # Example 4: Inspecting closure environments for debugging -------------------------------------
 #' # Shows how to extract and verify captured parameters from closures
-#'
+#' 
 #' library(data.table)
 #' data(simple_dt_date)
-#'
+#' 
 #' # Define trainable transformation
 #' gen_standardize <- function(cols, x, ...) {
 #'     train_means <- colMeans(x[, ..cols], na.rm = TRUE)
 #'     train_sds <- apply(x[, ..cols], 2, sd, na.rm = TRUE)
-#'
+#' 
 #'     function(x) {
 #'         x_copy <- copy(x)
 #'         for (col in cols) {
@@ -555,7 +561,7 @@ parse_pipes <- function(raw_pipes, env = parent.frame(), enclos = parent.frame()
 #'         return(x_copy)
 #'     }
 #' }
-#'
+#' 
 #' # Setup and parse
 #' data_list <- list(data = simple_dt_date)
 #' raw_pipe <- list(
@@ -565,52 +571,52 @@ parse_pipes <- function(raw_pipes, env = parent.frame(), enclos = parent.frame()
 #'     )
 #' )
 #' parsed <- parse_single_pipe(raw_pipe, env = data_list)
-#'
+#' 
 #' # Extract closure from parsed pipe
 #' closure <- parsed$transforms[[1]]
-#'
+#' 
 #' # Access closure's environment to see captured parameters
 #' closure_env <- environment(closure)
-#'
+#' 
 #' cat("Variables captured in closure environment:\n")
 #' print(ls(closure_env))
-#'
+#' 
 #' # Extract specific parameter values
 #' captured_means <- get("train_means", closure_env)
 #' captured_sds <- get("train_sds", closure_env)
 #' captured_cols <- get("cols", closure_env)
-#'
+#' 
 #' cat("\nCaptured parameters:\n")
 #' cat("  Columns:", captured_cols, "\n")
 #' cat("  Mean of X1:", captured_means["X1"], "\n")
 #' cat("  SD of X1:", captured_sds["X1"], "\n")
-#'
+#' 
 #' # Verify against manual computation
 #' manual_mean <- mean(simple_dt_date$X1, na.rm = TRUE)
 #' manual_sd <- sd(simple_dt_date$X1, na.rm = TRUE)
-#'
+#' 
 #' cat("\nVerification against manual computation:\n")
 #' cat("  Manual mean:", manual_mean, "\n")
 #' cat("  Captured mean:", captured_means["X1"], "\n")
 #' cat("  Match:", all.equal(manual_mean, captured_means["X1"]), "\n")
-#'
+#' 
 #' cat("\nUse cases for environment inspection:\n")
 #' cat("  - Debugging: verify parameters were computed correctly\n")
 #' cat("  - Serialization: extract params for storage/transmission\n")
 #' cat("  - Auditing: understand what the model learned\n")
 #' cat("  - Testing: validate closure behavior\n")
-#'
+#' 
 #' # Example 5: Using custom enclosing environment ------------------------------------------------
 #' # Demonstrates separation between data environment (env) and function environment (enclos)
-#'
+#' 
 #' library(data.table)
 #' data(simple_dt_date)
-#'
+#' 
 #' # Define generator in isolated environment (simulates package namespace or module)
 #' gen_standardize <- function(cols, x, ...) {
 #'     train_means <- colMeans(x[, ..cols], na.rm = TRUE)
 #'     train_sds <- apply(x[, ..cols], 2, sd, na.rm = TRUE)
-#'
+#' 
 #'     function(x) {
 #'         x_copy <- copy(x)
 #'         for (col in cols) {
@@ -619,14 +625,14 @@ parse_pipes <- function(raw_pipes, env = parent.frame(), enclos = parent.frame()
 #'         return(x_copy)
 #'     }
 #' }
-#'
+#' 
 #' # Create custom environment for functions
 #' custom_env <- new.env()
 #' assign("gen_standardize", gen_standardize, envir = custom_env)
-#'
+#' 
 #' # Create named list for data
 #' data_list <- list(data = simple_dt_date)
-#'
+#' 
 #' # Define raw pipe
 #' raw_pipe <- list(
 #'     on = "data",
@@ -634,19 +640,19 @@ parse_pipes <- function(raw_pipes, env = parent.frame(), enclos = parent.frame()
 #'         list(fun = "gen_standardize", cols = c("X1", "X2"))
 #'     )
 #' )
-#'
+#' 
 #' # Parse with BOTH env (for data) and enclos (for functions)
 #' # env = data_list: where to find "data"
 #' # enclos = custom_env: where to find "gen_standardize"
 #' parsed <- parse_single_pipe(raw_pipe, env = data_list, enclos = custom_env)
-#'
+#' 
 #' # Evaluate with same environments
 #' result <- eval_single_pipe(parsed, env = data_list, enclos = custom_env)
-#'
+#' 
 #' cat("Result using custom environments:\n")
 #' cat("  X1 mean:", round(mean(result$X1), 10), "\n")
 #' cat("  X2 mean:", round(mean(result$X2), 10), "\n")
-#'
+#' 
 #' cat("\nSeparation of concerns:\n")
 #' cat("  - env: controls DATA scope (where to find 'data')\n")
 #' cat("  - enclos: controls FUNCTION scope (where to find 'gen_standardize')\n")
@@ -684,7 +690,7 @@ eval_single_pipe <- function(pipe, env = parent.frame(), enclos = parent.frame()
 #' @param env environment where the pipe will be evaluated
 #' @param enclos enclosing environment for evaluation of the closures
 #' 
-#' @return single data.table combining the results of applying all pipes in `pipes`
+#' @return list of results from applying each pipe to its defined data
 #' 
 #' @seealso
 #' * \code{\link{eval_single_pipe}} for details on parse-eval separation

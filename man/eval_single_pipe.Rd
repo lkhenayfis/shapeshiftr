@@ -34,7 +34,7 @@ from training data, then applied identically to train, test, and production data
 \strong{Recommended Workflow with Named Lists}:
 \preformatted{
 # 1. Create named list with training data
-data_list <- list(data = train_data)
+data_list_train <- list(data = train_data)
 
 # 2. Define raw pipe referencing list element
 raw_pipe <- list(
@@ -43,16 +43,16 @@ raw_pipe <- list(
 )
 
 # 3. Parse on train: learn parameters
-parsed <- parse_single_pipe(raw_pipe, env = data_list)
+parsed <- parse_single_pipe(raw_pipe, env = data_list_train)
 
 # 4. Eval on train: transform with learned params
-train_result <- eval_single_pipe(parsed, env = data_list)
+train_result <- eval_single_pipe(parsed, env = data_list_train)
 
-# 5. Swap data in environment
-data_list$data <- test_data
+# 5. Define a test set of data
+data_list_test <- list(data = test_data)
 
 # 6. Eval on test: SAME params, different data
-test_result <- eval_single_pipe(parsed, env = data_list)
+test_result <- eval_single_pipe(parsed, env = data_list_test)
 }
 
 This pattern enables easy data swapping without modifying the pipe structure.
@@ -114,7 +114,7 @@ gen_standardize <- function(cols, x, ...) {
 }
 
 # Create named list containing data (recommended pattern)
-data_list <- list(data = simple_dt_date)
+data_list_train <- list(data = simple_dt_date)
 
 # Define raw pipe using reference to list element
 raw_pipe <- list(
@@ -125,10 +125,10 @@ raw_pipe <- list(
 )
 
 # PARSE: Learn parameters from data
-parsed <- parse_single_pipe(raw_pipe, env = data_list)
+parsed <- parse_single_pipe(raw_pipe, env = data_list_train)
 
 # EVAL: Apply learned transformation
-result <- eval_single_pipe(parsed, env = data_list)
+result <- eval_single_pipe(parsed, env = data_list_train)
 
 # Verify standardization
 cat("Column X1 - Mean:", mean(result$X1), "SD:", sd(result$X1), "\n")
@@ -136,6 +136,7 @@ cat("Column X2 - Mean:", mean(result$X2), "SD:", sd(result$X2), "\n")
 cat("Column Y - Mean:", mean(result$Y), "SD:", sd(result$Y), "\n")
 
 # Example 2: Train-test consistency - CORE USE CASE AND PRIMARY VALUE PROPOSITION ---------------
+
 # This example demonstrates the PRIMARY PURPOSE of the parse-eval separation:
 # ensuring transformations use TRAINING parameters on both train and test data.
 # This prevents data leakage and maintains statistical validity.
@@ -162,7 +163,7 @@ train_data <- simple_dt_date[1:15]
 test_data <- simple_dt_date[16:20]
 
 # Create named list with training data
-data_list <- list(data = train_data)
+data_list_train <- list(data = train_data)
 
 # Define raw pipe
 raw_pipe <- list(
@@ -173,7 +174,7 @@ raw_pipe <- list(
 )
 
 # STEP 2: PARSE on training data - Learn parameters (mean, sd) from train set
-parsed <- parse_single_pipe(raw_pipe, env = data_list)
+parsed <- parse_single_pipe(raw_pipe, env = data_list_train)
 
 # Extract and print captured training parameters for verification
 closure <- parsed$transforms[[1]]
@@ -188,7 +189,7 @@ cat("Training mean X2:", train_means["X2"], "\n")
 cat("Training sd X2:", train_sds["X2"], "\n")
 
 # STEP 3: EVAL on training data - Apply transformation to train set
-train_result <- eval_single_pipe(parsed, env = data_list)
+train_result <- eval_single_pipe(parsed, env = data_list_train)
 
 cat("\n=== TRAINING SET TRANSFORMATION ===\n")
 cat("Train X1 - Mean:", round(mean(train_result$X1), 10), "SD:", round(sd(train_result$X1), 6), "\n")
@@ -198,8 +199,8 @@ cat("(Should be mean ≈ 0, sd ≈ 1 because we used training params on training
 # STEP 4: EVAL on test data - Swap data in environment, apply SAME transformation
 # This is THE KEY STEP: we use the SAME parsed pipe (with training parameters)
 # but evaluate on different data
-data_list$data <- test_data
-test_result <- eval_single_pipe(parsed, env = data_list)
+data_list_test <- list(data = test_data)
+test_result <- eval_single_pipe(parsed, env = data_list_test)
 
 cat("\n=== TEST SET TRANSFORMATION ===\n")
 cat("Test X1 - Mean:", round(mean(test_result$X1), 6), "SD:", round(sd(test_result$X1), 6), "\n")
@@ -224,10 +225,15 @@ cat("  - Ensures reproducibility (same params in production)\n")
 cat("  - Maintains statistical validity (test is truly held-out)\n")
 
 # Example 3: Stacking multiple transformations --------------------------------------------------
+
 # Demonstrates chaining transformations while maintaining train-test consistency
 
 library(data.table)
 data(simple_dt_date)
+
+# modify data to ensure positive values for log transform
+simple_dt_date[, X1 := X1 + abs(min(X1)) + 1]
+simple_dt_date[, X2 := X2 + abs(min(X2)) + 1]
 
 # Define stateless log transformation
 gen_log_transform <- function(cols, offset = 1, ...) {
@@ -257,7 +263,7 @@ gen_standardize <- function(cols, x, ...) {
 # Split data
 train_data <- simple_dt_date[1:15]
 test_data <- simple_dt_date[16:20]
-data_list <- list(data = train_data)
+data_list_train <- list(data = train_data)
 
 # Define stacked transformations: first log, then standardize
 raw_pipe <- list(
@@ -269,15 +275,15 @@ raw_pipe <- list(
 )
 
 # Parse on training data (learns standardization params from log-transformed train data)
-parsed <- parse_single_pipe(raw_pipe, env = data_list)
+parsed <- parse_single_pipe(raw_pipe, env = data_list_train)
 
 # Apply to training data
-train_result <- eval_single_pipe(parsed, env = data_list)
+train_result <- eval_single_pipe(parsed, env = data_list_train)
 cat("Train after stacked transforms - X1 mean:", round(mean(train_result$X1), 10), "\n")
 
 # Apply to test data with same parameters
-data_list$data <- test_data
-test_result <- eval_single_pipe(parsed, env = data_list)
+data_list_test <- list(data = test_data)
+test_result <- eval_single_pipe(parsed, env = data_list_test)
 cat("Test after stacked transforms - X1 mean:", round(mean(test_result$X1), 6), "\n")
 cat("(Both transformations maintain consistency: same log offset, same train mean/sd)\n")
 
