@@ -1,0 +1,951 @@
+---
+title: "Transformation Consistency with Pipes"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Transformation Consistency with Pipes}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+    collapse = TRUE,
+    comment = "#>",
+    fig.width = 7,
+    fig.height = 5
+)
+```
+
+```{r libraries, message = FALSE}
+library(shapeshiftr)
+library(data.table)
+
+data(simple_dt_date)
+```
+
+## Introduction
+
+Forecasting model development faces a critical challenge: **ensuring transformation consistency between training, testing, and production data**.
+
+Consider this common scenario:
+
+1. You scale your training data to mean=0, sd=1 using **training set statistics**
+2. You fit a model on the scaled training data
+3. You need to evaluate on test data — but how do you scale it?
+
+**WRONG approach**: Compute mean and sd from TEST data and scale  
+**Result**: Data leakage! Test set statistics influenced the transformation  
+**Consequence**: Invalid model evaluation, overly optimistic performance estimates
+
+**RIGHT approach**: Use the SAME mean and sd from TRAINING data to scale test  
+**Result**: True held-out evaluation  
+**Challenge**: How to "remember" training parameters and apply them consistently?
+
+shapeshiftr's **pipes system** solves this through closure-based transformation generators that:
+
+- Compute parameters ONCE from training data (parse phase)
+- Apply those parameters MANY TIMES to train, test, and production data (eval phase)
+- Guarantee transformation consistency across all datasets
+
+### The Data Leakage Problem
+
+Let's see this problem in action with a concrete example:
+
+```{r data_leakage_example}
+set.seed(123)
+train_idx <- sample(seq_len(nrow(simple_dt_date)), 15)
+train_data <- simple_dt_date[train_idx, .(date, X1, X2, Y)]
+test_data <- simple_dt_date[-train_idx, .(date, X1, X2, Y)]
+
+# Training data - X1 statistics:
+cat(sprintf("  Mean: %g\n  SD: %g\n\n",
+        mean(train_data$X1), sd(train_data$X1)))
+
+# Test data - X1 statistics (DIFFERENT):
+cat(sprintf("  Mean: %g\n  SD: %g\n\n",
+        mean(test_data$X1), sd(test_data$X1)))
+
+# WRONG: Scale test data using TEST statistics (DATA LEAKAGE!)
+test_mean_WRONG <- mean(test_data$X1)
+test_sd_WRONG <- sd(test_data$X1)
+test_scaled_WRONG <- (test_data$X1 - test_mean_WRONG) / test_sd_WRONG
+
+# WRONG approach - Test data scaled with TEST stats:
+# Problem: Test statistics influenced the transformation!
+cat(sprintf("  Mean: %g (should be ~0)\n  SD: %g (should be ~1)\n\n",
+        round(mean(test_scaled_WRONG), 10),
+        round(sd(test_scaled_WRONG), 10)))
+
+# RIGHT: Scale test data using TRAINING statistics
+train_mean <- mean(train_data$X1)
+train_sd <- sd(train_data$X1)
+test_scaled_RIGHT <- (test_data$X1 - train_mean) / train_sd
+
+# RIGHT approach - Test data scaled with TRAINING stats:
+# Success: True held-out evaluation!
+cat(sprintf("  Mean: %g (NOT 0, as expected)\n  SD: %g (NOT 1, as expected)\n",
+        round(mean(test_scaled_RIGHT), 3),
+        round(sd(test_scaled_RIGHT), 3)))
+```
+
+**Key Insight**: The WRONG approach gives perfect 0/1 statistics because it used test data to compute them. The RIGHT approach gives different statistics, proving it's truly held-out.
+
+### The Pipes Solution
+
+shapeshiftr's pipes system automates the RIGHT approach through **closure generators**:
+
+```{r solution_preview, eval = FALSE}
+gen_scale <- function(cols, x, ...) {
+    train_means <- colMeans(x[, ..cols])
+    train_sds <- apply(x[, ..cols], 2, sd)
+
+    function(x) {
+        x_copy <- copy(x)
+        for (col in cols) {
+            x_copy[[col]] <- (x[[col]] - train_means[col]) / train_sds[col]
+        }
+        x_copy
+    }
+}
+
+parsed_pipe <- parse_single_pipe(
+    list(on = "data", transforms = list(list(fun = "gen_scale", cols = "X1"))),
+    env = list(data = train_data)
+)
+
+train_scaled <- eval_single_pipe(parsed_pipe, env = list(data = train_data))
+test_scaled <- eval_single_pipe(parsed_pipe, env = list(data = test_data))
+```
+
+Don't worry if this looks complex — Sections 2-4 will build your understanding step by step.
+
+## What You'll Learn
+
+This vignette teaches transformation consistency through eight progressive sections:
+
+1. **Introduction** (this section): The train-test consistency problem
+2. **Pipe Fundamentals**: Closure generator architecture and parse-eval workflow
+3. **Basic Usage Patterns**: Simple stateless and trainable transformations
+4. **Recipe-Based Transformations**: Five transformation generators (scaling, encoding, log, winsorization, Box-Cox)
+5. **Custom Closure Generators**: Writing your own domain-specific transformations
+6. **Advanced Patterns**: Chaining transformations and composition strategies
+7. **Integration with Slicing**: Combining pipes with temporal slicing for complete workflows
+8. **Complete Forecasting Pipeline**: End-to-end example with categorical encoding and slicing
+
+**Estimated reading time**: 20-25 minutes
+
+**Prerequisites**: 
+- Basic R knowledge (functions, lists, data.tables)
+- Familiarity with forecasting concepts (train/test split, feature engineering)
+- Optional: Read `vignette("slicing")` first for temporal slicing context
+
+Let's begin by understanding the closure architecture.
+
+## Pipe Fundamentals
+
+The pipes system separates transformation into two distinct phases:
+
+- **Parse phase**: Compute parameters from training data, generate closures
+- **Eval phase**: Apply closures to current data (train, test, or production)
+
+This separation is the key to train-test consistency.
+
+### Closure Generator Architecture
+
+A **closure generator** is a function that returns a function. The returned function (the closure) "remembers" variables from its parent environment.
+
+Here's the anatomy of a trainable closure generator:
+
+```{r closure_anatomy}
+gen_standardize <- function(cols, x, ...) {
+    train_means <- colMeans(x[, ..cols], na.rm = TRUE)
+    train_sds <- apply(x[, ..cols], 2, sd, na.rm = TRUE)
+
+    function(x) {
+        x_copy <- copy(x)
+        for (col in cols) {
+            x_copy[[col]] <- (x_copy[[col]] - train_means[col]) / train_sds[col]
+        }
+        x_copy
+    }
+}
+```
+
+**What happens**:
+
+1. Generator body executes ONCE during parse phase
+2. Computes `train_means` and `train_sds` from training data `x`
+3. Returns a closure that captures these computed parameters
+4. Closure executes MANY TIMES during eval phase
+5. Each eval uses the SAME captured parameters
+
+**Key architectural points**:
+
+- NO `parse` or `eval` arguments in the generator
+- NO `if (parse) {...} else {...}` branching logic
+- Separation is architectural (parse vs eval functions), not conditional
+- Generator accepts `x` (training data) and `...` (for interface consistency)
+- Closure only accepts `x` (current data to transform)
+
+### Parse-Eval Workflow
+
+The workflow uses two core functions: `parse_single_pipe()` and `eval_single_pipe()`.
+
+**Parse Phase** (happens ONCE with training data):
+
+```{r parse_workflow}
+train <- simple_dt_date[1:15]
+data_env <- list(data = train)
+
+raw_pipe <- list(
+    on = "data",
+    transforms = list(
+        list(fun = "gen_standardize", cols = c("X1", "X2"))
+    )
+)
+
+parsed <- parse_single_pipe(raw_pipe, env = data_env)
+```
+
+What `parse_single_pipe()` does:
+
+1. Looks up `"data"` in `data_env` (finds training data)
+2. Calls `gen_standardize(cols = c("X1", "X2"), x = data_env$data, ...)`
+3. Generator computes training statistics and returns closure
+4. Stores closure in `parsed$transforms[[1]]`
+
+**Eval Phase** (happens MANY TIMES with different data):
+
+```{r eval_workflow}
+train_result <- eval_single_pipe(parsed, env = data_env)
+
+# Training data transformation:
+cat(sprintf("X1 - Mean: %g, SD: %g\n",
+        round(mean(train_result$X1), 10),
+        round(sd(train_result$X1), 6)))
+
+test <- simple_dt_date[16:20]
+data_env$data <- test
+
+test_result <- eval_single_pipe(parsed, env = data_env)
+
+# Test data transformation (uses TRAINING parameters):
+cat(sprintf("X1 - Mean: %g, SD: %g\n",
+        round(mean(test_result$X1), 4),
+        round(sd(test_result$X1), 4)))
+```
+
+What `eval_single_pipe()` does:
+
+1. Looks up `"data"` in current `data_env` (could be train or test)
+2. Calls stored closure with current data: `closure(x = data_env$data)`
+3. Closure applies captured training parameters to current data
+4. Returns transformed data
+
+**Critical insight**: The SAME `parsed` pipe is used for both train and test, guaranteeing identical parameters.
+
+### Named List Data Swapping
+
+The recommended pattern uses named lists to enable easy data swapping:
+
+```{r named_list_pattern}
+train <- simple_dt_date[1:15]
+test <- simple_dt_date[16:20]
+
+data_list_train <- list(data = train)
+
+raw_pipe <- list(
+    on = "data",
+    transforms = list(
+        list(fun = "gen_standardize", cols = c("X1", "X2"))
+    )
+)
+
+parsed <- parse_single_pipe(raw_pipe, env = data_list_train)
+
+train_transformed <- eval_single_pipe(parsed, env = data_list_train)
+
+data_list_test <- list(data = test)
+
+test_transformed <- eval_single_pipe(parsed, env = data_list_test)
+```
+
+**Why this pattern**:
+
+- **Parse once**: Parameters computed from training data
+- **Eval many**: Apply to train, test, validation, production
+- **Easy swapping**: Change `env` parameter without modifying pipe structure
+- **Clear intent**: `on = "data"` references list element, not global variable
+
+### Train-Test Consistency Demonstration
+
+Let's verify the complete workflow ensures consistency:
+
+```{r consistency_demo}
+train <- simple_dt_date[1:15]
+test <- simple_dt_date[16:20]
+
+data_env <- list(data = train)
+
+raw_pipe <- list(
+    on = "data",
+    transforms = list(
+        list(fun = "gen_standardize", cols = c("X1", "X2"))
+    )
+)
+
+parsed <- parse_single_pipe(raw_pipe, env = data_env)
+
+closure <- parsed$transforms[[1]]
+closure_env <- environment(closure)
+captured_means <- get("train_means", closure_env)
+captured_sds <- get("train_sds", closure_env)
+
+# Captured training parameters:
+cat(sprintf("Training mean X1: %g\nTraining sd X1: %g\n\n",
+        captured_means["X1"], captured_sds["X1"]))
+
+train_result <- eval_single_pipe(parsed, env = data_env)
+
+# Training transformation (mean ≈ 0, sd ≈ 1):
+cat(sprintf("X1 - Mean: %g, SD: %g\n\n",
+        round(mean(train_result$X1), 10),
+        round(sd(train_result$X1), 6)))
+
+data_env$data <- test
+test_result <- eval_single_pipe(parsed, env = data_env)
+
+# Test transformation (uses TRAINING parameters):
+cat(sprintf("X1 - Mean: %g, SD: %g\n\n",
+        round(mean(test_result$X1), 4),
+        round(sd(test_result$X1), 4)))
+
+manual_verify <- (test$X1 - captured_means["X1"]) / captured_sds["X1"]
+cat(sprintf("Manual verification match: %s\n",
+        all.equal(manual_verify, test_result$X1)))
+```
+
+**Proof of consistency**: Test transformation uses captured training parameters, not test statistics.
+
+## Basic Usage Patterns
+
+Closure generators fall into two categories: **stateless** and **trainable**.
+
+### Stateless Transformations
+
+Stateless generators apply fixed operations without learning from training data.
+
+**Example: Log transformation**
+
+```{r stateless_example}
+gen_log <- function(cols, offset = 1, ...) {
+    function(x) {
+        x_copy <- copy(x)
+        for (col in cols) {
+            x_copy[[col]] <- log(x_copy[[col]] + offset)
+        }
+        x_copy
+    }
+}
+
+data_env <- list(data = simple_dt_date[1:15])
+
+raw_pipe <- list(
+    on = "data",
+    transforms = list(
+        list(fun = "gen_log", cols = "Y", offset = 1)
+    )
+)
+
+parsed <- parse_single_pipe(raw_pipe, env = data_env)
+result <- eval_single_pipe(parsed, env = data_env)
+
+# Original Y (first 5):
+print(head(data_env$data$Y, 5))
+
+# Logged Y (first 5):
+cat("\n")
+print(head(result$Y, 5))
+
+# Verification:
+cat(sprintf("\nExpected: %g\nGot: %g\n",
+        log(data_env$data$Y[1] + 1), result$Y[1]))
+```
+
+**Pattern**: No computation from `x` in generator body, all parameters are arguments.
+
+### Trainable Transformations
+
+Trainable generators learn parameters from training data.
+
+**Example: Standardization**
+
+```{r trainable_example}
+train <- simple_dt_date[1:15]
+test <- simple_dt_date[16:20]
+
+data_env <- list(data = train)
+
+raw_pipe <- list(
+    on = "data",
+    transforms = list(
+        list(fun = "gen_standardize", cols = c("X1", "X2"))
+    )
+)
+
+parsed <- parse_single_pipe(raw_pipe, env = data_env)
+
+train_result <- eval_single_pipe(parsed, env = data_env)
+
+# Training result:
+cat(sprintf("X1 - Mean: %g, SD: %g\n",
+        round(mean(train_result$X1), 10),
+        round(sd(train_result$X1), 6)))
+
+data_env$data <- test
+test_result <- eval_single_pipe(parsed, env = data_env)
+
+# Test result (uses training parameters):
+cat(sprintf("X1 - Mean: %g, SD: %g\n",
+        round(mean(test_result$X1), 4),
+        round(sd(test_result$X1), 4)))
+```
+
+**Pattern**: Generator body computes parameters from `x`, closure captures them.
+
+### Environment Management
+
+Both `parse_single_pipe()` and `eval_single_pipe()` accept `env` and `enclos` parameters:
+
+- **`env`**: Where to look up data references (e.g., `"data"` in `on = "data"`)
+  - Can be a named list, data.frame, or environment
+  - Controls DATA scope
+  
+- **`enclos`**: Where to look up function references (e.g., `"gen_standardize"`)
+  - Must be an environment
+  - Controls FUNCTION scope
+
+**Example: Custom function environment**
+
+```{r env_management}
+custom_env <- new.env()
+assign("gen_standardize", gen_standardize, envir = custom_env)
+
+data_list <- list(data = simple_dt_date[1:15])
+
+raw_pipe <- list(
+    on = "data",
+    transforms = list(
+        list(fun = "gen_standardize", cols = c("X1", "X2"))
+    )
+)
+
+parsed <- parse_single_pipe(raw_pipe, env = data_list, enclos = custom_env)
+result <- eval_single_pipe(parsed, env = data_list, enclos = custom_env)
+
+cat(sprintf("X1 mean: %g\n", round(mean(result$X1), 10)))
+```
+
+**Use cases**:
+- Package development (isolated namespaces)
+- Testing (controlled environments)
+- Deployment (function versioning)
+
+### Error Handling Basics
+
+Generators should validate inputs:
+
+```{r error_handling, error = TRUE}
+gen_standardize_safe <- function(cols, x, ...) {
+    if (!is.data.table(x) && !is.data.frame(x)) {
+        stop("x must be a data.table or data.frame")
+    }
+
+    missing_cols <- setdiff(cols, names(x))
+    if (length(missing_cols) > 0) {
+        stop("Columns not found: ", paste(missing_cols, collapse = ", "))
+    }
+
+    train_means <- colMeans(x[, ..cols], na.rm = TRUE)
+    train_sds <- apply(x[, ..cols], 2, sd, na.rm = TRUE)
+
+    function(x) {
+        x_copy <- copy(x)
+        for (col in cols) {
+            x_copy[[col]] <- (x_copy[[col]] - train_means[col]) / train_sds[col]
+        }
+        x_copy
+    }
+}
+
+data_env <- list(data = simple_dt_date[1:15])
+
+raw_pipe <- list(
+    on = "data",
+    transforms = list(
+        list(fun = "gen_standardize_safe", cols = c("X1", "MISSING"))
+    )
+)
+
+try(parse_single_pipe(raw_pipe, env = data_env))
+```
+
+**Best practices**:
+- Validate inputs in generator body (fails fast during parse)
+- Check column existence
+- Handle NA values appropriately
+- Provide clear error messages
+
+## Recipe-Based Transformations
+
+> **shapeshiftr as Infrastructure Framework**
+>
+> The transformation generators demonstrated in this section showcase the pipes framework's capabilities. However, **shapeshiftr is infrastructure, not a pre-built transformation toolkit**. These examples live in the vignette to teach the framework — they are not exported functions.
+>
+> For production forecasting workflows with extensive transformation needs, consider:
+>
+> - **recipes package**: Comprehensive pre-built transformation library for general ML
+> - **Future companion package**: Curated shapeshiftr-compatible generator library (planned)
+> - **Custom generators**: Write domain-specific transformations using patterns shown here (Section 5)
+>
+> shapeshiftr's value is providing the **closure-based parse-eval infrastructure** that ensures train-test consistency. You bring the transformations.
+
+### What This Section Demonstrates
+
+This section shows 5 common transformation types implemented as closure generators:
+
+1. **Scaling**: Standardization with training mean/sd
+2. **Categorical Encoding**: One-hot encoding with training factor levels
+3. **Mathematical Transform**: Log transformation (stateless)
+4. **Outlier Handling**: Winsorization at training quantiles
+5. **Variance Stabilization**: Box-Cox power transform
+
+Each example demonstrates the CORRECT closure pattern and train-test consistency.
+
+### Generator 1: Standardization (gen_scale_cols)
+
+**Purpose**: Standardize numeric columns to mean=0, sd=1 using training statistics
+
+**When to Use**: 
+- Models sensitive to scale (neural networks, SVM, regularized regression)
+- Features with different units or magnitudes
+- Before PCA or clustering
+
+**Pattern**: Trainable (learns mean and sd from training data)
+
+**Implementation**:
+
+```{r gen_scale_cols}
+gen_scale_cols <- function(cols, x, ...) {
+    train_means <- colMeans(x[, ..cols], na.rm = TRUE)
+    train_sds <- apply(x[, ..cols], 2, sd, na.rm = TRUE)
+
+    function(x) {
+        x_copy <- copy(x)
+        for (col in cols) {
+            x_copy[[col]] <- (x_copy[[col]] - train_means[col]) / train_sds[col]
+        }
+        x_copy
+    }
+}
+```
+
+**Demo: Train-Test Consistency**
+
+```{r demo_scale_cols}
+library(shapeshiftr)
+library(data.table)
+data(simple_dt_date)
+
+train <- simple_dt_date[1:15]
+test <- simple_dt_date[16:20]
+
+data_env <- list(data = train)
+
+pipe_scale <- list(
+    on = "data",
+    transforms = list(
+        list(fun = "gen_scale_cols", cols = c("X1", "X2", "X3"))
+    )
+)
+
+parsed_scale <- parse_single_pipe(pipe_scale, env = data_env)
+
+train_scaled <- eval_single_pipe(parsed_scale, env = data_env)
+
+# Training data (scaled):
+cat(sprintf("X1 - Mean: %g, SD: %g\nX2 - Mean: %g, SD: %g\n\n",
+        round(mean(train_scaled$X1), 6), round(sd(train_scaled$X1), 6),
+        round(mean(train_scaled$X2), 6), round(sd(train_scaled$X2), 6)))
+
+data_env$data <- test
+
+test_scaled <- eval_single_pipe(parsed_scale, env = data_env)
+
+# Test data (uses training mean/sd):
+# Different from 0/1 - correctly uses training stats
+cat(sprintf("X1 - Mean: %g, SD: %g\nX2 - Mean: %g, SD: %g\n\n",
+        round(mean(test_scaled$X1), 4), round(sd(test_scaled$X1), 4),
+        round(mean(test_scaled$X2), 4), round(sd(test_scaled$X2), 4)))
+
+cat("Train-test consistency: test uses training parameters\n")
+```
+
+**Key Insight**: Test data scaled with training mean/sd prevents data leakage
+
+### Generator 2: One-Hot Encoding (gen_one_hot)
+
+**Purpose**: Convert categorical variables to binary dummy variables using training factor levels
+
+**When to Use**:
+- Linear models requiring numeric inputs
+- Tree-based models (optional, they can handle factors directly)
+- When you need explicit control over reference level
+
+**Pattern**: Trainable (learns factor levels from training data)
+
+**Implementation**:
+
+```{r gen_one_hot}
+gen_one_hot <- function(col, x, drop_first = TRUE, ...) {
+    if (!is.factor(x[[col]])) {
+        x[[col]] <- as.factor(x[[col]])
+    }
+    train_levels <- levels(x[[col]])
+
+    if (drop_first) {
+        encode_levels <- train_levels[-1]
+    } else {
+        encode_levels <- train_levels
+    }
+
+    function(x) {
+        x_copy <- copy(x)
+
+        for (lev in encode_levels) {
+            col_name <- paste0(col, "_", lev)
+            x_copy[[col_name]] <- as.integer(x_copy[[col]] == lev)
+        }
+
+        x_copy[[col]] <- NULL
+        x_copy
+    }
+}
+```
+
+**Demo: Categorical Encoding**
+
+```{r demo_one_hot}
+library(shapeshiftr)
+library(data.table)
+data(simple_dt_date)
+
+simple_dt_date[, day_type := as.factor(day_type)]
+
+train <- simple_dt_date[1:15]
+test <- simple_dt_date[16:20]
+
+data_env <- list(data = train)
+
+pipe_onehot <- list(
+    on = "data",
+    transforms = list(
+        list(fun = "gen_one_hot", col = "day_type", drop_first = TRUE)
+    )
+)
+
+parsed_onehot <- parse_single_pipe(pipe_onehot, env = data_env)
+
+train_encoded <- eval_single_pipe(parsed_onehot, env = data_env)
+
+# Original day_type (training):
+print(head(train$day_type, 8))
+
+# Encoded columns (training):
+cat(sprintf("\nColumns created: %s\n",
+        paste(setdiff(names(train_encoded), names(train)), collapse = ", ")))
+print(head(train_encoded[, .(date, day_type_weekend)], 8))
+
+data_env$data <- test
+
+test_encoded <- eval_single_pipe(parsed_onehot, env = data_env)
+
+# Test data encoded with training levels:
+cat("\n")
+print(head(test_encoded[, .(date, day_type_weekend)], 5))
+
+cat("\nOne-hot encoding uses training levels on test data\n")
+```
+
+**Key Insight**: Test data encoded using training factor levels prevents unseen level errors
+
+### Generator 3: Log Transformation (gen_log_transform)
+
+**Purpose**: Apply log transformation with optional offset
+
+**When to Use**:
+- Right-skewed distributions
+- Multiplicative relationships → additive
+- Variance stabilization for count data
+- Before modeling with linear assumptions
+
+**Pattern**: Stateless (no training needed, offset is fixed)
+
+**Implementation**:
+
+```{r gen_log_transform}
+gen_log_transform <- function(cols, offset = 1, base = exp(1), ...) {
+    function(x) {
+        x_copy <- copy(x)
+        for (col in cols) {
+            if (base == exp(1)) {
+                x_copy[[col]] <- log(x_copy[[col]] + offset)
+            } else if (base == 10) {
+                x_copy[[col]] <- log10(x_copy[[col]] + offset)
+            } else if (base == 2) {
+                x_copy[[col]] <- log2(x_copy[[col]] + offset)
+            } else {
+                x_copy[[col]] <- log(x_copy[[col]] + offset) / log(base)
+            }
+        }
+        x_copy
+    }
+}
+```
+
+**Demo: Log Transformation**
+
+```{r demo_log_transform}
+library(shapeshiftr)
+library(data.table)
+data(simple_dt_date)
+
+data_env <- list(data = simple_dt_date[1:15])
+
+pipe_log <- list(
+    on = "data",
+    transforms = list(
+        list(fun = "gen_log_transform", cols = "Y", offset = 1)
+    )
+)
+
+parsed_log <- parse_single_pipe(pipe_log, env = data_env)
+
+train_logged <- eval_single_pipe(parsed_log, env = data_env)
+
+# Original Y (training, first 5):
+print(head(data_env$data$Y, 5))
+
+# Logged Y (training, first 5):
+cat("\n")
+print(head(train_logged$Y, 5))
+
+# Verification: log(Y + 1)
+cat(sprintf("\nExpected: %g\nGot: %g\n\n",
+        log(data_env$data$Y[1] + 1), train_logged$Y[1]))
+
+data_env$data <- simple_dt_date[16:20]
+test_logged <- eval_single_pipe(parsed_log, env = data_env)
+
+# Test data also log-transformed:
+print(head(test_logged$Y, 5))
+
+cat("\nStateless: Same transformation applied to all data\n")
+```
+
+**Key Insight**: Stateless transformations apply fixed operations uniformly
+
+### Generator 4: Winsorization (gen_winsorize)
+
+**Purpose**: Clip extreme values at training data quantiles
+
+**When to Use**:
+- Reduce outlier influence without removal
+- Robust transformation before scaling
+- Preserve sample size while limiting extremes
+- When outliers are measurement errors, not true extremes
+
+**Pattern**: Trainable (learns quantile bounds from training data)
+
+**Implementation**:
+
+```{r gen_winsorize}
+gen_winsorize <- function(cols, x, lower = 0.05, upper = 0.95, ...) {
+    bounds <- lapply(cols, function(col) {
+        quantile(x[[col]], c(lower, upper), na.rm = TRUE, names = FALSE)
+    })
+    names(bounds) <- cols
+
+    function(x) {
+        x_copy <- copy(x)
+        for (col in cols) {
+            lower_bound <- bounds[[col]][1]
+            upper_bound <- bounds[[col]][2]
+            x_copy[[col]] <- pmin(pmax(x_copy[[col]], lower_bound), upper_bound)
+        }
+        x_copy
+    }
+}
+```
+
+**Demo: Outlier Clipping**
+
+```{r demo_winsorize}
+library(shapeshiftr)
+library(data.table)
+data(simple_dt_date)
+
+train <- simple_dt_date[1:15]
+test <- simple_dt_date[16:20]
+
+data_env <- list(data = train)
+
+pipe_winsor <- list(
+    on = "data",
+    transforms = list(
+        list(fun = "gen_winsorize", cols = c("X1", "X2"),
+            lower = 0.1, upper = 0.9)
+    )
+)
+
+parsed_winsor <- parse_single_pipe(pipe_winsor, env = data_env)
+
+train_winsor <- eval_single_pipe(parsed_winsor, env = data_env)
+
+# Training X1:
+bounds_10_90 <- quantile(train$X1, c(0.1, 0.9))
+cat(sprintf("Original range: %g to %g\nWinsorized range: %g to %g\n",
+        min(train$X1), max(train$X1),
+        min(train_winsor$X1), max(train_winsor$X1)))
+cat(sprintf("10th/90th percentiles (bounds): %g, %g\n\n",
+        bounds_10_90[1], bounds_10_90[2]))
+
+data_env$data <- test
+
+test_winsor <- eval_single_pipe(parsed_winsor, env = data_env)
+
+# Test X1:
+# Uses training bounds, not test quantiles
+cat(sprintf("Original range: %g to %g\nWinsorized range: %g to %g\n\n",
+        min(test$X1), max(test$X1),
+        min(test_winsor$X1), max(test_winsor$X1)))
+
+cat("Winsorization clips test data at training quantiles\n")
+```
+
+**Key Insight**: Test outliers clipped using training quantiles maintains consistency
+
+### Generator 5: Box-Cox Transform (gen_boxcox)
+
+**Purpose**: Power transformation for variance stabilization and normality
+
+**When to Use**:
+- Heteroscedastic errors (variance increases with mean)
+- Non-normal distributions
+- Before linear regression with normality assumptions
+- When sqrt or log transforms insufficient
+
+**Pattern**: Trainable (estimates lambda from training data)
+
+**Note**: This is a simplified implementation using fixed lambda=0.5 (square root). Production code would estimate optimal lambda via maximum likelihood.
+
+**Implementation**:
+
+```{r gen_boxcox}
+gen_boxcox <- function(cols, x, ...) {
+    lambdas <- setNames(rep(0.5, length(cols)), cols)
+
+    cat(sprintf("Box-Cox lambdas (simplified to 0.5 for demo): %s\n\n",
+            paste(names(lambdas), lambdas, sep = "=", collapse = ", ")))
+
+    function(x) {
+        x_copy <- copy(x)
+        for (col in cols) {
+            lambda <- lambdas[col]
+            if (lambda == 0) {
+                x_copy[[col]] <- log(x_copy[[col]])
+            } else {
+                x_copy[[col]] <- (x_copy[[col]]^lambda - 1) / lambda
+            }
+        }
+        x_copy
+    }
+}
+```
+
+**Demo: Box-Cox Transform**
+
+```{r demo_boxcox}
+library(shapeshiftr)
+library(data.table)
+data(simple_dt_date)
+
+train <- simple_dt_date[1:15]
+test <- simple_dt_date[16:20]
+
+data_env <- list(data = train)
+
+pipe_boxcox <- list(
+    on = "data",
+    transforms = list(
+        list(fun = "gen_boxcox", cols = "X3")
+    )
+)
+
+parsed_boxcox <- parse_single_pipe(pipe_boxcox, env = data_env)
+
+train_bc <- eval_single_pipe(parsed_boxcox, env = data_env)
+
+# Training X3:
+cat(sprintf("Original - Mean: %g, SD: %g\nBox-Cox - Mean: %g, SD: %g\n\n",
+        round(mean(train$X3), 3), round(sd(train$X3), 3),
+        round(mean(train_bc$X3), 3), round(sd(train_bc$X3), 3)))
+
+data_env$data <- test
+
+test_bc <- eval_single_pipe(parsed_boxcox, env = data_env)
+
+# Test X3 (uses training lambda=0.5):
+cat(sprintf("Original - Mean: %g\nBox-Cox - Mean: %g\n\n",
+        round(mean(test$X3), 3), round(mean(test_bc$X3), 3)))
+
+cat("Box-Cox applies training lambda to test data\n")
+```
+
+**Key Insight**: Test data transformed with training lambda ensures consistency
+
+### Transformation Summary
+
+| Generator | Type | Purpose | Learns From Training |
+|-----------|------|---------|---------------------|
+| `gen_scale_cols` | Trainable | Standardization (mean=0, sd=1) | Mean, SD |
+| `gen_one_hot` | Trainable | Categorical encoding | Factor levels |
+| `gen_log_transform` | Stateless | Log transformation | None (fixed offset) |
+| `gen_winsorize` | Trainable | Outlier clipping | Quantile bounds |
+| `gen_boxcox` | Trainable | Variance stabilization | Lambda parameter |
+
+**Common Pattern**: All trainable generators:
+1. Compute parameters from training data in generator body
+2. Return closure that captures those parameters
+3. Closure applies parameters to current data
+4. Test data uses training parameters → train-test consistency
+
+**Code Location**: These generators are demonstration code living in this vignette. They are **not exported functions**. For production use, write your own generators (Section 5) or use a dedicated transformation library like recipes.
+
+### Key Takeaways
+
+- **5 transformation types demonstrated**: scaling, one-hot encoding, log, winsorization, Box-Cox
+- **Trainable generators** (4 of 5): Learn parameters from training data during parse
+- **Stateless generators** (1 of 5): Apply fixed transformations without training
+- **CORRECT closure pattern**: All generators use parameter computation in generator body, application in closure
+- **Train-test consistency**: All demos show test data using training parameters
+- **Framework positioning**: shapeshiftr is infrastructure, these are learning examples (not package exports)
+- **Categorical handling**: `gen_one_hot` enables mixed-type feature engineering
+- **Data leakage prevention**: Architecture makes it impossible to compute test statistics
+
+**Production Usage**:
+- Use these patterns to write custom generators for your domain (Section 5)
+- Consider recipes package for extensive pre-built transformations
+- Combine multiple transformations with closure composition (Section 6)
+
+Next, we'll learn how to **write custom closure generators** for domain-specific transformations (Section 5).
