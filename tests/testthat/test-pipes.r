@@ -33,6 +33,18 @@ raw_pipes <- list(
 
 data_list <- list(mtcars = mtcars)
 
+wrench_single_pipe <- function(parsed_pipe) {
+    transforms <- parsed_pipe$transforms
+    transforms <- lapply(transforms, function(t) t[[1]])
+    parsed_pipe$transforms <- transforms
+    return(parsed_pipe)
+}
+
+wrench_pipes <- function(parsed_pipes) {
+    parsed_pipes <- lapply(parsed_pipes, wrench_single_pipe)
+    return(parsed_pipes)
+}
+
 test_that("parse_single_pipe", {
 
     f <- parse_single_pipe
@@ -133,7 +145,7 @@ test_that("eval_single_pipe", {
     expect_true(is.function(f))
 
     test_that("caso de uso padrao", {
-        parsed_pipe <- parse_single_pipe(raw_pipes[[1]])
+        parsed_pipe <- wrench_single_pipe(parse_single_pipe(raw_pipes[[1]]))
 
         eval_pipe <- f(parsed_pipe)
 
@@ -145,7 +157,7 @@ test_that("eval_single_pipe", {
     test_that("env e uma lista/data.frame", {
         data_list <- list(mtcars = mtcars)
 
-        parsed_pipe <- parse_single_pipe(raw_pipes[[1]], env = data_list, enclos = env)
+        parsed_pipe <- wrench_single_pipe(parse_single_pipe(raw_pipes[[1]], env = data_list, enclos = env))
 
         eval_pipe <- f(parsed_pipe, env = data_list, enclos = env)
 
@@ -161,7 +173,7 @@ test_that("eval_pipes", {
     expect_true(is.function(f))
 
     test_that("caso de uso padrao", {
-        parsed_pipes <- parse_pipes(raw_pipes)
+        parsed_pipes <- wrench_pipes(parse_pipes(raw_pipes))
 
         eval_pipe <- f(parsed_pipes)
 
@@ -174,7 +186,7 @@ test_that("eval_pipes", {
     test_that("env e uma lista/list", {
         data_list <- list(mtcars = mtcars)
 
-        parsed_pipes <- parse_pipes(raw_pipes, env = data_list, enclos = env)
+        parsed_pipes <- wrench_pipes(parse_pipes(raw_pipes, env = data_list, enclos = env))
         eval_pipe <- f(parsed_pipes, env = data_list, enclos = env)
 
         expect_true(inherits(eval_pipe, "list"))
@@ -189,7 +201,7 @@ test_that("combine_pipes", {
     expect_true(is.function(f))
 
     test_that("caso de uso padrao", {
-        parsed_pipes <- parse_pipes(raw_pipes)
+        parsed_pipes <- wrench_pipes(parse_pipes(raw_pipes))
         eval_pipe    <- eval_pipes(parsed_pipes)
 
         cfun <- function(x, y, ...) rbind(x, y)
@@ -720,7 +732,7 @@ test_that("forward_single_pipe integration", {
 
         suppressWarnings({
             result_forward <- f(parsed, env = data_env)
-            result_eval <- eval_single_pipe(parsed, env = data_env)
+            result_eval <- eval_single_pipe(wrench_single_pipe(parsed), env = data_env)
         })
 
         expect_equal(result_forward, result_eval, tolerance = 1e-5)
