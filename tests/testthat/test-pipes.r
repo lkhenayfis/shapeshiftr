@@ -50,13 +50,13 @@ test_that("parse_single_pipe", {
         l_t <- parsed_pipe$transforms
 
         expect_equal(length(l_t), 2)
-        expect_true(all(sapply(l_t, inherits, what = "function")))
+        expect_true(all(sapply(l_t, inherits, what = "shapeshiftr_closure")))
 
-        expect_equal(formalArgs(l_t[[1]]), "x")
-        expect_equal(formalArgs(l_t[[2]]), "x")
+        expect_equal(formalArgs(l_t[[1]]$forward), "x")
+        expect_equal(formalArgs(l_t[[2]]$forward), "x")
 
-        expect_equal(deparse(body(l_t[[1]])), "x[x[[by]] == value, ]")
-        expect_equal(deparse(body(l_t[[2]])), "summary(x)")
+        expect_equal(deparse(body(l_t[[1]]$forward)), "x[x[[by]] == value, ]")
+        expect_equal(deparse(body(l_t[[2]]$forward)), "summary(x)")
     })
 
     test_that("env e uma lista/data.frame", {
@@ -72,13 +72,13 @@ test_that("parse_single_pipe", {
         l_t <- parsed_pipe$transforms
 
         expect_equal(length(l_t), 2)
-        expect_true(all(sapply(l_t, inherits, what = "function")))
+        expect_true(all(sapply(l_t, inherits, what = "shapeshiftr_closure")))
 
-        expect_equal(formalArgs(l_t[[1]]), "x")
-        expect_equal(formalArgs(l_t[[2]]), "x")
+        expect_equal(formalArgs(l_t[[1]]$forward), "x")
+        expect_equal(formalArgs(l_t[[2]]$forward), "x")
 
-        expect_equal(deparse(body(l_t[[1]])), "x[x[[by]] == value, ]")
-        expect_equal(deparse(body(l_t[[2]])), "summary(x)")
+        expect_equal(deparse(body(l_t[[1]]$forward)), "x[x[[by]] == value, ]")
+        expect_equal(deparse(body(l_t[[2]]$forward)), "summary(x)")
     })
 })
 
@@ -105,7 +105,7 @@ test_that("parse_pipes", {
             l_t <- parsed_pipe$transforms
 
             expect_equal(length(l_t), 2)
-            expect_true(all(sapply(l_t, inherits, what = "function")))
+            expect_true(all(sapply(l_t, inherits, what = "shapeshiftr_closure")))
         }
     })
 
