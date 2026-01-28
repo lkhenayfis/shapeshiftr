@@ -125,10 +125,10 @@ This vignette teaches transformation consistency through eight progressive secti
 
 1. **Introduction** (this section): The train-test consistency problem
 2. **Pipe Fundamentals**: Closure generator architecture and parse-eval workflow
-3. **Basic Usage Patterns**: Simple stateless and trainable transformations
+3. **Basic Usage Patterns**: Simple stateless and trainable transformations and combining multiple pipes
 4. **Recipe-Based Transformations**: Five transformation generators (scaling, encoding, log, winsorization, Box-Cox)
 5. **Custom Closure Generators**: Writing your own domain-specific transformations
-6. **Advanced Patterns**: Chaining transformations and composition strategies
+6. **Advanced Patterns**: Chaining transformations, composition strategies
 7. **Integration with Slicing**: Combining pipes with temporal slicing for complete workflows
 8. **Complete Forecasting Pipeline**: End-to-end example with categorical encoding and slicing
 
@@ -195,7 +195,7 @@ The workflow uses two core functions: `parse_single_pipe()` and `eval_single_pip
 
 ```{r parse_workflow}
 train <- simple_dt_date[1:15]
-data_env <- list(data = train)
+data_env_train <- list(data = train)
 
 raw_pipe <- list(
     on = "data",
@@ -204,20 +204,20 @@ raw_pipe <- list(
     )
 )
 
-parsed <- parse_single_pipe(raw_pipe, env = data_env)
+parsed <- parse_single_pipe(raw_pipe, env = data_env_train)
 ```
 
 What `parse_single_pipe()` does:
 
-1. Looks up `"data"` in `data_env` (finds training data)
-2. Calls `gen_standardize(cols = c("X1", "X2"), x = data_env$data, ...)`
+1. Looks up `"data"` in `data_env_train` (finds training data)
+2. Calls `gen_standardize(cols = c("X1", "X2"), x = data_env_train$data, ...)`
 3. Generator computes training statistics and returns closure
 4. Stores closure in `parsed$transforms[[1]]`
 
 **Eval Phase** (happens MANY TIMES with different data):
 
 ```{r eval_workflow}
-train_result <- eval_single_pipe(parsed, env = data_env)
+train_result <- eval_single_pipe(parsed, env = data_env_train)
 
 # Training data transformation:
 cat(sprintf("X1 - Mean: %g, SD: %g\n",
@@ -225,9 +225,9 @@ cat(sprintf("X1 - Mean: %g, SD: %g\n",
         round(sd(train_result$X1), 6)))
 
 test <- simple_dt_date[16:20]
-data_env$data <- test
+data_env_test <- list(data = test)
 
-test_result <- eval_single_pipe(parsed, env = data_env)
+test_result <- eval_single_pipe(parsed, env = data_env_test)
 
 # Test data transformation (uses TRAINING parameters):
 cat(sprintf("X1 - Mean: %g, SD: %g\n",
@@ -237,8 +237,8 @@ cat(sprintf("X1 - Mean: %g, SD: %g\n",
 
 What `eval_single_pipe()` does:
 
-1. Looks up `"data"` in current `data_env` (could be train or test)
-2. Calls stored closure with current data: `closure(x = data_env$data)`
+1. Looks up `"data"` in current `data_env_test` (could be train or test)
+2. Calls stored closure with current data: `closure(x = data_env_test$data)`
 3. Closure applies captured training parameters to current data
 4. Returns transformed data
 
@@ -285,7 +285,7 @@ Let's verify the complete workflow ensures consistency:
 train <- simple_dt_date[1:15]
 test <- simple_dt_date[16:20]
 
-data_env <- list(data = train)
+data_env_train <- list(data = train)
 
 raw_pipe <- list(
     on = "data",
@@ -294,7 +294,7 @@ raw_pipe <- list(
     )
 )
 
-parsed <- parse_single_pipe(raw_pipe, env = data_env)
+parsed <- parse_single_pipe(raw_pipe, env = data_env_train)
 
 closure <- parsed$transforms[[1]]
 closure_env <- environment(closure)
@@ -305,15 +305,15 @@ captured_sds <- get("train_sds", closure_env)
 cat(sprintf("Training mean X1: %g\nTraining sd X1: %g\n\n",
         captured_means["X1"], captured_sds["X1"]))
 
-train_result <- eval_single_pipe(parsed, env = data_env)
+train_result <- eval_single_pipe(parsed, env = data_env_train)
 
 # Training transformation (mean ≈ 0, sd ≈ 1):
 cat(sprintf("X1 - Mean: %g, SD: %g\n\n",
         round(mean(train_result$X1), 10),
         round(sd(train_result$X1), 6)))
 
-data_env$data <- test
-test_result <- eval_single_pipe(parsed, env = data_env)
+data_env_test <- list(data = test)
+test_result <- eval_single_pipe(parsed, env = data_env_test)
 
 # Test transformation (uses TRAINING parameters):
 cat(sprintf("X1 - Mean: %g, SD: %g\n\n",
@@ -384,7 +384,7 @@ Trainable generators learn parameters from training data.
 train <- simple_dt_date[1:15]
 test <- simple_dt_date[16:20]
 
-data_env <- list(data = train)
+data_env_train <- list(data = train)
 
 raw_pipe <- list(
     on = "data",
@@ -393,17 +393,17 @@ raw_pipe <- list(
     )
 )
 
-parsed <- parse_single_pipe(raw_pipe, env = data_env)
+parsed <- parse_single_pipe(raw_pipe, env = data_env_train)
 
-train_result <- eval_single_pipe(parsed, env = data_env)
+train_result <- eval_single_pipe(parsed, env = data_env_train)
 
 # Training result:
 cat(sprintf("X1 - Mean: %g, SD: %g\n",
         round(mean(train_result$X1), 10),
         round(sd(train_result$X1), 6)))
 
-data_env$data <- test
-test_result <- eval_single_pipe(parsed, env = data_env)
+data_env_test <- list(data = test)
+test_result <- eval_single_pipe(parsed, env = data_env_test)
 
 # Test result (uses training parameters):
 cat(sprintf("X1 - Mean: %g, SD: %g\n",
@@ -412,6 +412,45 @@ cat(sprintf("X1 - Mean: %g, SD: %g\n",
 ```
 
 **Pattern**: Generator body computes parameters from `x`, closure captures them.
+
+### Combining Multiple Pipes
+
+So far `raw_pipe` has always defined transformations regarding a single variable. In practice you
+may want to define multiple pipes for different variables or transformation sequences.
+
+```{r combining_pipes}
+raw_pipes <- list(
+    list(
+        on = "data_first_half",
+        transforms = list(
+            list(fun = "gen_standardize", cols = c("X1", "X2"))
+        )
+    ),
+    list(
+        on = "data_second_half",
+        transforms = list(
+            list(fun = "gen_standardize", cols = c("X1", "X2"))
+        )
+    )
+)
+
+data_list <- list(
+    data_first_half = simple_dt_date[1:10],
+    data_second_half = simple_dt_date[11:20]
+)
+
+parsed <- parse_pipes(raw_pipes, env = data_list)
+
+result <- eval_pipes(parsed, env = data_list)
+
+# combining by rbind, for example
+comb_fun <- function(x1, x2) rbind(x1, x2)
+combine_pipes(result, comb_fun)
+```
+
+In this simple example we combined the results manually using `combine_pipes()` with rbind. More
+complex combination strategies can be implemented as needed. In fact, one could wrap everything in
+pipes as well through a more heterdox use of the pipes described later in Advanced Patterns.
 
 ### Environment Management
 
@@ -560,7 +599,7 @@ data(simple_dt_date)
 train <- simple_dt_date[1:15]
 test <- simple_dt_date[16:20]
 
-data_env <- list(data = train)
+data_env_train <- list(data = train)
 
 pipe_scale <- list(
     on = "data",
@@ -569,18 +608,18 @@ pipe_scale <- list(
     )
 )
 
-parsed_scale <- parse_single_pipe(pipe_scale, env = data_env)
+parsed_scale <- parse_single_pipe(pipe_scale, env = data_env_train)
 
-train_scaled <- eval_single_pipe(parsed_scale, env = data_env)
+train_scaled <- eval_single_pipe(parsed_scale, env = data_env_train)
 
 # Training data (scaled):
 cat(sprintf("X1 - Mean: %g, SD: %g\nX2 - Mean: %g, SD: %g\n\n",
         round(mean(train_scaled$X1), 6), round(sd(train_scaled$X1), 6),
         round(mean(train_scaled$X2), 6), round(sd(train_scaled$X2), 6)))
 
-data_env$data <- test
+data_env_test <- list(data = test)
 
-test_scaled <- eval_single_pipe(parsed_scale, env = data_env)
+test_scaled <- eval_single_pipe(parsed_scale, env = data_env_test)
 
 # Test data (uses training mean/sd):
 # Different from 0/1 - correctly uses training stats
@@ -640,12 +679,13 @@ library(shapeshiftr)
 library(data.table)
 data(simple_dt_date)
 
-simple_dt_date[, day_type := as.factor(day_type)]
+train <- copy(simple_dt_date[1:15])
+test <- copy(simple_dt_date[16:20])
 
-train <- simple_dt_date[1:15]
-test <- simple_dt_date[16:20]
+train[, day_type := as.factor(day_type)]
+test[, day_type := as.factor(day_type)]
 
-data_env <- list(data = train)
+data_env_train <- list(data = train)
 
 pipe_onehot <- list(
     on = "data",
@@ -654,9 +694,9 @@ pipe_onehot <- list(
     )
 )
 
-parsed_onehot <- parse_single_pipe(pipe_onehot, env = data_env)
+parsed_onehot <- parse_single_pipe(pipe_onehot, env = data_env_train)
 
-train_encoded <- eval_single_pipe(parsed_onehot, env = data_env)
+train_encoded <- eval_single_pipe(parsed_onehot, env = data_env_train)
 
 # Original day_type (training):
 print(head(train$day_type, 8))
@@ -666,9 +706,9 @@ cat(sprintf("\nColumns created: %s\n",
         paste(setdiff(names(train_encoded), names(train)), collapse = ", ")))
 print(head(train_encoded[, .(date, day_type_weekend)], 8))
 
-data_env$data <- test
+data_env_test <- list(data = test)
 
-test_encoded <- eval_single_pipe(parsed_onehot, env = data_env)
+test_encoded <- eval_single_pipe(parsed_onehot, env = data_env_test)
 
 # Test data encoded with training levels:
 cat("\n")
@@ -720,7 +760,7 @@ library(shapeshiftr)
 library(data.table)
 data(simple_dt_date)
 
-data_env <- list(data = simple_dt_date[1:15])
+data_env_train <- list(data = simple_dt_date[1:15])
 
 pipe_log <- list(
     on = "data",
@@ -729,12 +769,12 @@ pipe_log <- list(
     )
 )
 
-parsed_log <- parse_single_pipe(pipe_log, env = data_env)
+parsed_log <- parse_single_pipe(pipe_log, env = data_env_train)
 
-train_logged <- eval_single_pipe(parsed_log, env = data_env)
+train_logged <- eval_single_pipe(parsed_log, env = data_env_train)
 
 # Original Y (training, first 5):
-print(head(data_env$data$Y, 5))
+print(head(data_env_train$data$Y, 5))
 
 # Logged Y (training, first 5):
 cat("\n")
@@ -742,10 +782,9 @@ print(head(train_logged$Y, 5))
 
 # Verification: log(Y + 1)
 cat(sprintf("\nExpected: %g\nGot: %g\n\n",
-        log(data_env$data$Y[1] + 1), train_logged$Y[1]))
-
-data_env$data <- simple_dt_date[16:20]
-test_logged <- eval_single_pipe(parsed_log, env = data_env)
+        log(data_env_train$data$Y[1] + 1), train_logged$Y[1]))
+data_env_test <- list(data = simple_dt_date[16:20])
+test_logged <- eval_single_pipe(parsed_log, env = data_env_test)
 
 # Test data also log-transformed:
 print(head(test_logged$Y, 5))
@@ -798,7 +837,7 @@ data(simple_dt_date)
 train <- simple_dt_date[1:15]
 test <- simple_dt_date[16:20]
 
-data_env <- list(data = train)
+data_env_train <- list(data = train)
 
 pipe_winsor <- list(
     on = "data",
@@ -808,9 +847,9 @@ pipe_winsor <- list(
     )
 )
 
-parsed_winsor <- parse_single_pipe(pipe_winsor, env = data_env)
+parsed_winsor <- parse_single_pipe(pipe_winsor, env = data_env_train)
 
-train_winsor <- eval_single_pipe(parsed_winsor, env = data_env)
+train_winsor <- eval_single_pipe(parsed_winsor, env = data_env_train)
 
 # Training X1:
 bounds_10_90 <- quantile(train$X1, c(0.1, 0.9))
@@ -820,9 +859,9 @@ cat(sprintf("Original range: %g to %g\nWinsorized range: %g to %g\n",
 cat(sprintf("10th/90th percentiles (bounds): %g, %g\n\n",
         bounds_10_90[1], bounds_10_90[2]))
 
-data_env$data <- test
+data_env_test <- list(data = test)
 
-test_winsor <- eval_single_pipe(parsed_winsor, env = data_env)
+test_winsor <- eval_single_pipe(parsed_winsor, env = data_env_test)
 
 # Test X1:
 # Uses training bounds, not test quantiles
@@ -883,7 +922,7 @@ data(simple_dt_date)
 train <- simple_dt_date[1:15]
 test <- simple_dt_date[16:20]
 
-data_env <- list(data = train)
+data_env_train <- list(data = train)
 
 pipe_boxcox <- list(
     on = "data",
@@ -892,18 +931,18 @@ pipe_boxcox <- list(
     )
 )
 
-parsed_boxcox <- parse_single_pipe(pipe_boxcox, env = data_env)
+parsed_boxcox <- parse_single_pipe(pipe_boxcox, env = data_env_train)
 
-train_bc <- eval_single_pipe(parsed_boxcox, env = data_env)
+train_bc <- eval_single_pipe(parsed_boxcox, env = data_env_train)
 
 # Training X3:
 cat(sprintf("Original - Mean: %g, SD: %g\nBox-Cox - Mean: %g, SD: %g\n\n",
         round(mean(train$X3), 3), round(sd(train$X3), 3),
         round(mean(train_bc$X3), 3), round(sd(train_bc$X3), 3)))
 
-data_env$data <- test
+data_env_test <- list(data = test)
 
-test_bc <- eval_single_pipe(parsed_boxcox, env = data_env)
+test_bc <- eval_single_pipe(parsed_boxcox, env = data_env_test)
 
 # Test X3 (uses training lambda=0.5):
 cat(sprintf("Original - Mean: %g\nBox-Cox - Mean: %g\n\n",
