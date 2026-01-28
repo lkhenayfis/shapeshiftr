@@ -464,62 +464,121 @@ default_combine <- function(x, y, ...) {
 
 # FORWARD/BACKWARD EVALUATION ----------------------------------------------------------------------
 
-#' Apply Forward Transformations to Single Pipe
+#' Apply Forward or Backward Transformations
 #'
-#' Extracts forward closures from a parsed pipe and applies them sequentially
-#' using \code{eval_single_pipe()}. This is the recommended way to apply
-#' forward transformations.
+#' Apply transformations from a parsed pipe in the forward (original) or backward (inverse) direction
 #'
-#' @details
-#' This function provides a clearer interface than the deprecated
-#' \code{eval_single_pipe()} by making the directionality of transformations
-#' explicit. It extracts the \code{$forward} component from each
-#' \code{shapeshiftr_closure} object in the pipe's transforms, then delegates
-#' to \code{eval_single_pipe()} for execution.
+#' `forward_single_pipe()` extracts the forward closures from each
+#' transformation and applies them sequentially. This is the standard way
+#' to apply learned transformations to new data.
 #'
-#' For reversible transformations, use \code{backward_single_pipe()} to apply
-#' the inverse transformations in reverse order.
+#' `backward_single_pipe()` extracts the backward (inverse) closures,
+#' reverses their order, and applies them to reconstruct the original data.
+#' This enables perfect roundtrips: `backward(forward(x)) ≈ x`.
 #'
-#' @param pipe A pipe parsed by \code{parse_single_pipe()}
-#' @param env Environment where the pipe will be evaluated
-#' @param enclos Enclosing environment for evaluation of the closures
+#' The backward function applies transformations in reverse order. If forward
+#' applies f1 → f2 → f3, backward applies f3_inv → f2_inv → f1_inv.
 #'
-#' @return Result of applying the forward closures in \code{transforms} to the
-#'     data in \code{"on"}
+#' ## Train-Test Consistency:
+#' 
+#' Both forward and backward transformations use parameters learned during
+#' the parse phase (on training data). This ensures test data is transformed
+#' using training statistics, preventing data leakage.
+#'
+#' Example: If a scaling transformation learns mean=5 and sd=2 from training
+#' data, those same parameters are used when transforming test data, even if
+#' the test data has different mean/sd.
+#'
+#' ## Roundtrip Validation:
+#' 
+#' For reversible transformations, applying backward after forward should
+#' reconstruct the original data within numerical precision:
+#' \preformatted{
+#'   # Parse on training data
+#'   parsed <- parse_single_pipe(raw_pipe, env = train_env)
+#'   
+#'   # Forward transformation
+#'   transformed <- forward_single_pipe(parsed, env = train_env)
+#'   
+#'   # Backward transformation
+#'   reconstructed <- backward_single_pipe(parsed, env = list(data = transformed))
+#'   
+#'   # Verify roundtrip
+#'   all.equal(train_data, reconstructed)  # Should be TRUE (within tolerance)
+#' }
+#'
+#' @param pipe Pipe parsed by `parse_single_pipe`
+#' @param env Environment where data objects are found
+#' @param enclos Enclosing environment for closure evaluation
+#'
+#' @return Transformed data (forward) or reconstructed data (backward)
 #'
 #' @seealso
-#' * \code{\link{backward_single_pipe}} for applying inverse transformations
-#' * \code{\link{forward_pipes}} for evaluating multiple pipes
-#' * \code{\link{parse_single_pipe}} for creating parsed pipes
-#' * \code{\link{eval_single_pipe}} (deprecated) for legacy evaluation
+#' * [`forward_pipes()`], [`backward_pipes()`] for multiple pipes
+#' * [`parse_single_pipe()`] for creating parsed pipes
+#' * [`eval_single_pipe()`] (internal helper)
 #'
 #' @examples
 #' \dontrun{
 #' library(data.table)
 #' data(simple_dt_date)
 #'
+#' # Create a reversible generator
 #' gen_standardize <- function(cols, x, ...) {
 #'     train_means <- colMeans(x[, ..cols], na.rm = TRUE)
 #'     train_sds <- apply(x[, ..cols], 2, sd, na.rm = TRUE)
-#'     function(x) {
+#'     
+#'     forward <- function(x) {
 #'         x_copy <- copy(x)
 #'         for (col in cols) {
 #'             x_copy[[col]] <- (x_copy[[col]] - train_means[col]) / train_sds[col]
 #'         }
 #'         return(x_copy)
 #'     }
+#'     
+#'     backward <- function(x) {
+#'         x_copy <- copy(x)
+#'         for (col in cols) {
+#'             x_copy[[col]] <- (x_copy[[col]] * train_sds[col]) + train_means[col]
+#'         }
+#'         return(x_copy)
+#'     }
+#'     
+#'     list(forward = forward, backward = backward)
 #' }
 #'
+#' # Setup data
 #' data_list <- list(data = simple_dt_date)
 #' raw_pipe <- list(
 #'     on = "data",
 #'     transforms = list(list(fun = "gen_standardize", cols = c("X1", "X2")))
 #' )
 #'
+#' # Parse on training data
 #' parsed <- parse_single_pipe(raw_pipe, env = data_list)
-#' result <- forward_single_pipe(parsed, env = data_list)
+#'
+#' # Forward transformation
+#' standardized <- forward_single_pipe(parsed, env = data_list)
+#' cat("Standardized means:", colMeans(standardized[, .(X1, X2)]), "\n")
+#' # Should be approximately [0, 0]
+#'
+#' # Backward transformation (roundtrip)
+#' reconstructed <- backward_single_pipe(parsed, env = list(data = standardized))
+#' cat("Roundtrip error:", max(abs(data_list$data - reconstructed)), "\n")
+#' # Should be < 1e-10
+#'
+#' # Train-test consistency
+#' test_data <- copy(simple_dt_date)
+#' test_data$X1 <- test_data$X1 + 10  # Different mean
+#' test_env <- list(data = test_data)
+#'
+#' # Uses training parameters (not test data statistics)
+#' test_standardized <- forward_single_pipe(parsed, env = test_env)
+#' cat("Test data uses training params\n")
 #' }
 #'
+#' @rdname forward_backward_single_pipe
+#' 
 #' @export
 
 forward_single_pipe <- function(pipe, env = parent.frame(), enclos = parent.frame()) {
@@ -528,64 +587,8 @@ forward_single_pipe <- function(pipe, env = parent.frame(), enclos = parent.fram
     eval_single_pipe(temp_pipe, env = env, enclos = enclos)
 }
 
-#' Apply Backward Transformations to Single Pipe
-#'
-#' Extracts backward closures from a parsed pipe, reverses their order, and
-#' applies them sequentially using \code{eval_single_pipe()}. This enables
-#' inverse transformations for reversible pipelines.
-#'
-#' @details
-#' This function applies transformations in reverse by:
-#' 1. Extracting the \code{$backward} component from each
-#'    \code{shapeshiftr_closure} object
-#' 2. Reversing the order of closures with \code{rev()}
-#' 3. Delegating to \code{eval_single_pipe()} for execution
-#'
-#' The reversal is critical for correct inverse transformations. If the forward
-#' pipe applies transformations \code{f1}, then \code{f2}, then \code{f3}, the
-#' backward pipe applies \code{f3_inv}, then \code{f2_inv}, then \code{f1_inv}.
-#'
-#' For generators that don't provide explicit backward closures, the identity
-#' function \code{function(x) x} is used by default.
-#'
-#' @param pipe A pipe parsed by \code{parse_single_pipe()}
-#' @param env Environment where the pipe will be evaluated
-#' @param enclos Enclosing environment for evaluation of the closures
-#'
-#' @return Result of applying the backward closures (in reverse order) to the
-#'     data in \code{"on"}
-#'
-#' @seealso
-#' * \code{\link{forward_single_pipe}} for applying forward transformations
-#' * \code{\link{backward_pipes}} for evaluating multiple pipes
-#' * \code{\link{parse_single_pipe}} for creating parsed pipes
-#'
-#' @examples
-#' \dontrun{
-#' library(data.table)
-#' data(simple_dt_date)
-#'
-#' gen_log_exp <- function(...) {
-#'     list(
-#'         forward = function(x) log(x),
-#'         backward = function(x) exp(x)
-#'     )
-#' }
-#'
-#' data_list <- list(data = abs(simple_dt_date$X1) + 1)
-#' raw_pipe <- list(
-#'     on = "data",
-#'     transforms = list(list(fun = "gen_log_exp"))
-#' )
-#'
-#' parsed <- parse_single_pipe(raw_pipe, env = data_list)
-#' forward_result <- forward_single_pipe(parsed, env = data_list)
-#' backward_result <- backward_single_pipe(
-#'     parsed,
-#'     env = list(data = forward_result)
-#' )
-#' }
-#'
+#' @rdname forward_backward_single_pipe
+#' 
 #' @export
 
 backward_single_pipe <- function(pipe, env = parent.frame(), enclos = parent.frame()) {
@@ -595,101 +598,72 @@ backward_single_pipe <- function(pipe, env = parent.frame(), enclos = parent.fra
     eval_single_pipe(temp_pipe, env = env, enclos = enclos)
 }
 
-#' Apply Forward Transformations to Multiple Pipes
+#' Apply Forward or Backward Transformations to Multiple Pipes
 #'
-#' Simple wrapper for applying \code{forward_single_pipe()} over multiple
-#' pipes. This is the recommended way to apply forward transformations to
-#' multiple pipes.
+#' @description
+#' Apply transformations to multiple pipes in the forward (original) or
+#' backward (inverse) direction. These are simple \code{lapply} wrappers
+#' over \code{forward_single_pipe()} and \code{backward_single_pipe()}.
 #'
-#' @param pipes List of parsed pipes from \code{parse_pipes()}
-#' @param env Environment where the pipes will be evaluated
-#' @param enclos Enclosing environment for evaluation of the closures
+#' @details
+#' \code{forward_pipes()} applies forward transformations to each pipe in
+#' the list, returning a list of transformed data.
 #'
-#' @return List of results from applying forward transformations to each pipe
+#' \code{backward_pipes()} applies backward transformations to each pipe,
+#' returning a list of reconstructed data.
+#'
+#' These functions are useful when working with multiple related pipelines
+#' (e.g., transforming different datasets with different configurations).
+#'
+#' @param pipes List of pipes parsed by \code{\link{parse_pipes}}
+#' @param env Environment where data objects are found
+#' @param enclos Enclosing environment for closure evaluation
+#'
+#' @return List of transformed (forward) or reconstructed (backward) data
 #'
 #' @seealso
-#' * \code{\link{forward_single_pipe}} for single pipe evaluation
-#' * \code{\link{backward_pipes}} for applying inverse transformations
+#' * \code{\link{forward_single_pipe}}, \code{\link{backward_single_pipe}}
 #' * \code{\link{parse_pipes}} for creating multiple parsed pipes
-#' * \code{\link{combine_pipes}} for combining evaluation results
-#' * \code{\link{eval_pipes}} (deprecated) for legacy evaluation
+#' * \code{\link{eval_pipes}} (internal helper)
 #'
 #' @examples
 #' \dontrun{
 #' library(data.table)
 #' data(simple_dt_date)
 #'
-#' gen_standardize <- function(cols, x, ...) {
-#'     train_means <- colMeans(x[, ..cols], na.rm = TRUE)
-#'     train_sds <- apply(x[, ..cols], 2, sd, na.rm = TRUE)
-#'     function(x) {
-#'         x_copy <- copy(x)
-#'         for (col in cols) {
-#'             x_copy[[col]] <- (x_copy[[col]] - train_means[col]) / train_sds[col]
-#'         }
-#'         return(x_copy)
-#'     }
-#' }
-#'
+#' # Multiple pipes for different column sets
 #' data_list <- list(data = simple_dt_date)
 #' raw_pipes <- list(
-#'     list(on = "data", transforms = list(list(fun = "gen_standardize", cols = "X1"))),
-#'     list(on = "data", transforms = list(list(fun = "gen_standardize", cols = "X2")))
+#'     list(
+#'         on = "data",
+#'         transforms = list(list(fun = "gen_standardize", cols = "X1"))
+#'     ),
+#'     list(
+#'         on = "data",
+#'         transforms = list(list(fun = "gen_standardize", cols = "X2"))
+#'     )
 #' )
 #'
+#' # Parse all pipes
 #' parsed <- parse_pipes(raw_pipes, env = data_list)
+#'
+#' # Forward transformations on all pipes
 #' results <- forward_pipes(parsed, env = data_list)
+#' cat("Number of transformed datasets:", length(results), "\n")
+#'
+#' # Backward transformations (roundtrip)
+#' reconstructed <- backward_pipes(parsed, env = list(data = results[[1]]))
+#' cat("Roundtrip successful:", all.equal(data_list$data, reconstructed[[1]]), "\n")
 #' }
 #'
+#' @rdname forward_backward_pipes
 #' @export
 
 forward_pipes <- function(pipes, env = parent.frame(), enclos = parent.frame()) {
     lapply(pipes, forward_single_pipe, env = env, enclos = enclos)
 }
 
-#' Apply Backward Transformations to Multiple Pipes
-#'
-#' Simple wrapper for applying \code{backward_single_pipe()} over multiple
-#' pipes. This enables inverse transformations for multiple reversible
-#' pipelines.
-#'
-#' @param pipes List of parsed pipes from \code{parse_pipes()}
-#' @param env Environment where the pipes will be evaluated
-#' @param enclos Enclosing environment for evaluation of the closures
-#'
-#' @return List of results from applying backward transformations to each pipe
-#'
-#' @seealso
-#' * \code{\link{backward_single_pipe}} for single pipe evaluation
-#' * \code{\link{forward_pipes}} for applying forward transformations
-#' * \code{\link{parse_pipes}} for creating multiple parsed pipes
-#' * \code{\link{combine_pipes}} for combining evaluation results
-#'
-#' @examples
-#' \dontrun{
-#' library(data.table)
-#' data(simple_dt_date)
-#'
-#' gen_log_exp <- function(...) {
-#'     list(
-#'         forward = function(x) log(abs(x) + 1),
-#'         backward = function(x) exp(x) - 1
-#'     )
-#' }
-#'
-#' data_list <- list(data = simple_dt_date$X1)
-#' raw_pipes <- list(
-#'     list(on = "data", transforms = list(list(fun = "gen_log_exp")))
-#' )
-#'
-#' parsed <- parse_pipes(raw_pipes, env = data_list)
-#' forward_results <- forward_pipes(parsed, env = data_list)
-#' backward_results <- backward_pipes(
-#'     parsed,
-#'     env = list(data = forward_results[[1]])
-#' )
-#' }
-#'
+#' @rdname forward_backward_pipes
 #' @export
 
 backward_pipes <- function(pipes, env = parent.frame(), enclos = parent.frame()) {
