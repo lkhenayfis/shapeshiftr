@@ -109,6 +109,21 @@ there are more transformations, the resulting closure is immediately applied to 
 and the resulting data is passed as \code{x} to the next generator in the list, and so on. This
 ensures that each transformation is applied in sequence, with each one receiving the output of
 the previous one as input.
+\subsection{Closure Wrapping for Reversibility}{
+
+Generator results are automatically wrapped in \code{shapeshiftr_closure} objects to enable
+reversible transformations. This wrapping is transparent to existing code:
+\itemize{
+\item \strong{Single-closure generators}: The returned closure becomes the \code{forward} transformation,
+and an identity function \code{function(x) x} is used as the \code{backward} transformation
+\item \strong{Paired-closure generators}: Generators can return a list of two closures
+\code{list(forward, backward)} for explicitly reversible transformations
+\item \strong{Chaining}: During parse, only the \code{forward} closure is used for sequential chaining
+\item \strong{Backward compatibility}: The wrapping is handled by the constructor and maintains
+compatibility with all existing single-closure generators
+}
+}
+
 }
 
 \subsection{Stateless vs Trainable Transformations}{
@@ -153,7 +168,7 @@ raw_pipe <- list(
 
 # Parse: creates closure (no training needed)
 parsed <- parse_single_pipe(raw_pipe)
-print(parsed$transforms[[1]](simple_dt_date))
+print(parsed$transforms[[1]]$forward(simple_dt_date))
 
 # Example 2: Stacking transformations -----------------------------------------------------------
 
@@ -204,7 +219,7 @@ raw_pipe <- list(
 )
 
 parsed <- parse_single_pipe(raw_pipe)
-print(parsed$transforms[[1]](simple_dt_date))
+print(parsed$transforms[[1]]$forward(simple_dt_date))
 
 # Example 4: Using environments to control scope ------------------------------------------------
 
@@ -233,7 +248,7 @@ raw_pipe <- list(
 parsed <- parse_single_pipe(raw_pipe, env = data_list, enclos = env)
 
 # exactly the same as previous example
-print(parsed$transforms[[1]](data_list$dt))
+print(parsed$transforms[[1]]$forward(data_list$dt))
 
 }
 \seealso{

@@ -177,7 +177,7 @@ raw_pipe <- list(
 parsed <- parse_single_pipe(raw_pipe, env = data_list_train)
 
 # Extract and print captured training parameters for verification
-closure <- parsed$transforms[[1]]
+closure <- parsed$transforms[[1]]$forward
 closure_env <- environment(closure)
 train_means <- get("train_means", closure_env)
 train_sds <- get("train_sds", closure_env)
@@ -317,8 +317,8 @@ raw_pipe <- list(
 )
 parsed <- parse_single_pipe(raw_pipe, env = data_list)
 
-# Extract closure from parsed pipe
-closure <- parsed$transforms[[1]]
+# Extract forward closure from parsed pipe
+closure <- parsed$transforms[[1]]$forward
 
 # Access closure's environment to see captured parameters
 closure_env <- environment(closure)
