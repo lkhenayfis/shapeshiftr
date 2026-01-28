@@ -17,10 +17,13 @@ eval_pipes(pipes, env = parent.frame(), enclos = parent.frame())
 list of results from applying each pipe to its defined data
 }
 \description{
+\strong{Deprecated}: Use \code{\link{forward_pipes}} instead.
+
 Simple wrapper for looping \code{eval_single_pipe} over multiple pipes
 }
 \seealso{
 \itemize{
+\item \code{\link{forward_pipes}} (recommended replacement)
 \item \code{\link{eval_single_pipe}} for details on parse-eval separation
 \item \code{\link{parse_pipes}} for creating multiple parsed pipes
 }

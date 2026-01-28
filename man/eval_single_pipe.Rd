@@ -17,6 +17,8 @@ eval_single_pipe(pipe, env = parent.frame(), enclos = parent.frame())
 result of applying the closures in \code{transforms} to the data in \code{"on"}
 }
 \description{
+\strong{Deprecated}: Use \code{\link{forward_single_pipe}} instead.
+
 Applies the closures in a \code{pipe} already parsed to the data defined in \code{"on"}
 }
 \details{
@@ -407,6 +409,7 @@ cat("  - Useful for: package development, isolated testing, deployment\n")
 }
 \seealso{
 \itemize{
+\item \code{\link{forward_single_pipe}} (recommended replacement)
 \item \code{\link{parse_single_pipe}} for creating parsed pipes
 \item \code{\link{eval_pipes}} for evaluating multiple pipes
 \item \code{\link{combine_pipes}} for combining evaluation results
