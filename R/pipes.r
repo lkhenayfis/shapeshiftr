@@ -307,25 +307,18 @@ parse_pipes <- function(raw_pipes, env = parent.frame(), enclos = parent.frame()
 #' @keywords internal
 
 eval_single_pipe <- function(pipe, env = parent.frame(), enclos = parent.frame()) {
-    .Deprecated(
-        "forward_single_pipe",
-        msg = "eval_single_pipe() is deprecated. Use forward_single_pipe() instead."
-    )
-
     args <- lapply(pipe$on, str2lang)
     names(args) <- c("x", "y")[seq_along(args)]
 
     l_t <- pipe$transforms
 
-    first_fn <- if (inherits(l_t[[1]], "shapeshiftr_closure")) l_t[[1]]$forward else l_t[[1]]
-    cc <- c(list(first_fn), args)
+    cc <- c(list(l_t[[1]]), args)
     x <- eval(as.call(cc), env, enclos)
     l_t[[1]] <- NULL
 
     if (length(l_t) >= 1) {
         for (f in l_t) {
-            fn <- if (inherits(f, "shapeshiftr_closure")) f$forward else f
-            cc <- list(fn, x)
+            cc <- list(f, x)
             x <- eval(as.call(cc), env, enclos)
         }
     }
@@ -350,11 +343,6 @@ eval_single_pipe <- function(pipe, env = parent.frame(), enclos = parent.frame()
 #' @keywords internal
 
 eval_pipes <- function(pipes, env = parent.frame(), enclos = parent.frame()) {
-    .Deprecated(
-        "forward_pipes",
-        msg = "eval_pipes() is deprecated. Use forward_pipes() instead."
-    )
-
     lapply(pipes, eval_single_pipe, env = env, enclos = enclos)
 }
 
