@@ -126,6 +126,29 @@ compatibility with all existing single-closure generators
 
 }
 
+\subsection{Reversible Transformations}{
+
+All generator results are automatically wrapped in \code{shapeshiftr_closure} objects,
+which store both forward and backward transformation closures:
+\itemize{
+\item \strong{Single closure generators}: Return a single function. This is wrapped with an
+identity backward function: \code{list(forward = result, backward = function(x) x)}
+\item \strong{Paired closure generators}: Return a list with named elements \code{forward} and
+\code{backward}. This is wrapped as-is, preserving both closures for true reversibility.
+}
+
+The wrapping is transparent - parsed pipes can be used with \code{forward_single_pipe()}
+to apply forward transformations or \code{backward_single_pipe()} to apply inverse
+transformations.
+}
+
+\subsection{Environment Sharing}{
+
+For paired closure generators, the forward and backward closures must share the
+same environment (verified with \code{identical()}). This ensures both closures access
+the same captured parameters (e.g., training means and SDs).
+}
+
 \subsection{Stateless vs Trainable Transformations}{
 
 For the sake of clarity, transformations can be classified into two categories: stateless and
@@ -250,11 +273,51 @@ parsed <- parse_single_pipe(raw_pipe, env = data_list, enclos = env)
 # exactly the same as previous example
 print(parsed$transforms[[1]]$forward(data_list$dt))
 
+# Example 5: Reversible generator with forward and backward closures ---------------------------
+
+# Define a reversible generator that returns paired closures
+gen_scale <- function(x, ...) {
+    train_mean <- mean(x, na.rm = TRUE)
+    train_sd <- sd(x, na.rm = TRUE)
+    
+    forward <- function(x) {
+        (x - train_mean) / train_sd
+    }
+    
+    backward <- function(x) {
+        (x * train_sd) + train_mean
+    }
+    
+    # Return paired closures for reversibility
+    list(forward = forward, backward = backward)
+}
+
+# Parse with reversible generator
+train_data <- c(10, 20, 30, 40, 50)
+data_list <- list(data = train_data)
+raw_pipe <- list(
+    on = "data",
+    transforms = list(list(fun = "gen_scale"))
+)
+
+parsed <- parse_single_pipe(raw_pipe, env = data_list)
+
+# Apply forward transformation
+standardized <- forward_single_pipe(parsed, env = data_list)
+print(standardized)  # Mean approximately 0, SD approximately 1
+
+# Apply backward transformation (roundtrip)
+reconstructed <- backward_single_pipe(parsed, env = list(data = standardized))
+all.equal(train_data, reconstructed)  # TRUE (within numerical tolerance)
+
 }
 \seealso{
 \itemize{
+\item \code{\link{forward_single_pipe}}, \code{\link{backward_single_pipe}} for applying
+forward/backward transformations
 \item \code{\link{eval_single_pipe}} for applying parsed closures to data
 \item \code{\link{parse_pipes}} for parsing multiple pipes
 \item \code{\link{combine_pipes}} for combining multiple parsed pipes
+\item \code{\link{new_shapeshiftr_closure}} (internal constructor)
 }
 }
