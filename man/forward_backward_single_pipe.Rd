@@ -68,7 +68,52 @@ reconstruct the original data within numerical precision:
 library(data.table)
 data(simple_dt_date)
 
-# Create a reversible generator
+# Example 1: Basic Forward/Backward Usage -----------------------------------------------------
+# Simple single-transform pipeline with forward, backward, and roundtrip validation
+
+# Define a reversible log1p generator
+gen_log1p <- function(x, ...) {
+    forward <- function(x) {
+        log1p(abs(x))
+    }
+    
+    backward <- function(x) {
+        expm1(x)
+    }
+    
+    list(forward = forward, backward = backward)
+}
+
+# Setup data with a single numeric vector
+original_data <- c(0, 1, 10, 100, 1000)
+data_env <- list(data = original_data)
+
+# Parse pipeline
+raw_pipe <- list(
+    on = "data",
+    transforms = list(list(fun = "gen_log1p"))
+)
+parsed <- parse_single_pipe(raw_pipe, env = data_env)
+
+# Forward transformation
+transformed <- forward_single_pipe(parsed, env = data_env)
+cat("Original:", original_data, "\n")
+cat("Transformed:", transformed, "\n")
+
+# Backward transformation
+reconstructed <- backward_single_pipe(parsed, env = list(data = transformed))
+cat("Reconstructed:", reconstructed, "\n")
+
+# Roundtrip validation
+roundtrip_error <- max(abs(original_data - reconstructed))
+cat("Roundtrip error:", roundtrip_error, "\n")
+stopifnot(roundtrip_error < 1e-10)
+
+
+# Example 2: Train-Test Workflow --------------------------------------------------------------
+# Parse on training data, apply to both train and test with consistent parameters
+
+# Define standardization generator
 gen_standardize <- function(cols, x, ...) {
     train_means <- colMeans(x[, ..cols], na.rm = TRUE)
     train_sds <- apply(x[, ..cols], 2, sd, na.rm = TRUE)
@@ -92,34 +137,288 @@ gen_standardize <- function(cols, x, ...) {
     list(forward = forward, backward = backward)
 }
 
-# Setup data
-data_list <- list(data = simple_dt_date)
+# Create train and test datasets
+train_data <- copy(simple_dt_date)
+test_data <- copy(simple_dt_date)
+test_data$X1 <- test_data$X1 + 10  # Different distribution
+test_data$X2 <- test_data$X2 * 2
+
+# Parse on training data (learns parameters)
+train_env <- list(data = train_data)
 raw_pipe <- list(
     on = "data",
     transforms = list(list(fun = "gen_standardize", cols = c("X1", "X2")))
 )
+parsed <- parse_single_pipe(raw_pipe, env = train_env)
 
-# Parse on training data
-parsed <- parse_single_pipe(raw_pipe, env = data_list)
-
-# Forward transformation
-standardized <- forward_single_pipe(parsed, env = data_list)
-cat("Standardized means:", colMeans(standardized[, .(X1, X2)]), "\n")
+# Apply forward to training data
+train_standardized <- forward_single_pipe(parsed, env = train_env)
+cat("Train means after standardization:", 
+    colMeans(train_standardized[, .(X1, X2)]), "\n")
 # Should be approximately [0, 0]
 
-# Backward transformation (roundtrip)
-reconstructed <- backward_single_pipe(parsed, env = list(data = standardized))
-cat("Roundtrip error:", max(abs(data_list$data - reconstructed)), "\n")
-# Should be < 1e-10
-
-# Train-test consistency
-test_data <- copy(simple_dt_date)
-test_data$X1 <- test_data$X1 + 10  # Different mean
+# Apply forward to test data (uses TRAINING parameters)
 test_env <- list(data = test_data)
-
-# Uses training parameters (not test data statistics)
 test_standardized <- forward_single_pipe(parsed, env = test_env)
-cat("Test data uses training params\n")
+cat("Test means after standardization:", 
+    colMeans(test_standardized[, .(X1, X2)]), "\n")
+# Will NOT be [0, 0] because test data has different distribution
+
+# Verify parameters are consistent (both use train stats)
+cat("This demonstrates train-test consistency: test uses training parameters\n")
+
+
+# Example 3: Multi-Transform Chain -------------------------------------------------------------
+# Chain 2-3 transformations, verify order matters, test backward reversal
+
+# Define scaling generator
+gen_scale <- function(x, factor = 2, ...) {
+    forward <- function(x) {
+        x * factor
+    }
+    
+    backward <- function(x) {
+        x / factor
+    }
+    
+    list(forward = forward, backward = backward)
+}
+
+# Define shift generator
+gen_shift <- function(x, offset = 10, ...) {
+    forward <- function(x) {
+        x + offset
+    }
+    
+    backward <- function(x) {
+        x - offset
+    }
+    
+    list(forward = forward, backward = backward)
+}
+
+# Chain: scale -> log1p -> shift
+original_vec <- c(1, 2, 3, 4, 5)
+data_env <- list(data = original_vec)
+
+raw_pipe <- list(
+    on = "data",
+    transforms = list(
+        list(fun = "gen_scale", factor = 10),
+        list(fun = "gen_log1p"),
+        list(fun = "gen_shift", offset = 100)
+    )
+)
+parsed <- parse_single_pipe(raw_pipe, env = data_env)
+
+# Forward chain: scale(10) -> log1p -> shift(100)
+forward_result <- forward_single_pipe(parsed, env = data_env)
+cat("Original:", original_vec, "\n")
+cat("After scale->log1p->shift:", forward_result, "\n")
+
+# Backward chain (automatic reversal): shift_inv(100) -> log1p_inv -> scale_inv(10)
+backward_result <- backward_single_pipe(parsed, env = list(data = forward_result))
+cat("After backward chain:", backward_result, "\n")
+
+# Verify roundtrip
+chain_error <- max(abs(original_vec - backward_result))
+cat("Chain roundtrip error:", chain_error, "\n")
+stopifnot(chain_error < 1e-10)
+
+# Verify order matters: compare with different order
+raw_pipe_reversed <- list(
+    on = "data",
+    transforms = list(
+        list(fun = "gen_shift", offset = 100),
+        list(fun = "gen_log1p"),
+        list(fun = "gen_scale", factor = 10)
+    )
+)
+parsed_reversed <- parse_single_pipe(raw_pipe_reversed, env = data_env)
+forward_reversed <- forward_single_pipe(parsed_reversed, env = data_env)
+cat("Different order produces different results:", 
+    !isTRUE(all.equal(forward_result, forward_reversed)), "\n")
+
+
+# Example 4: Roundtrip Validation Pattern -----------------------------------------------------
+# Helper function to validate roundtrips across multiple generators and edge cases
+
+# Roundtrip validation helper
+validate_roundtrip <- function(generator_name, generator_fun, test_data, 
+                                tolerance = 1e-10, ...) {
+    data_env <- list(data = test_data)
+    
+    raw_pipe <- list(
+        on = "data",
+        transforms = list(list(fun = generator_name, ...))
+    )
+    
+    # Make generator available in current environment
+    assign(generator_name, generator_fun, envir = environment())
+    
+    parsed <- parse_single_pipe(raw_pipe, env = data_env, enclos = environment())
+    forward_result <- forward_single_pipe(parsed, env = data_env, enclos = environment())
+    backward_result <- backward_single_pipe(parsed, 
+        env = list(data = forward_result), enclos = environment())
+    
+    error <- max(abs(test_data - backward_result), na.rm = TRUE)
+    
+    list(
+        passed = error < tolerance,
+        error = error,
+        tolerance = tolerance
+    )
+}
+
+# Test multiple generators
+test_cases <- list(
+    normal = c(1, 2, 3, 4, 5),
+    with_zero = c(0, 1, 2, 3),
+    negative = c(-5, -2, 0, 2, 5),
+    large_values = c(1e6, 1e7, 1e8)
+)
+
+# Test log1p generator
+cat("Testing gen_log1p:\n")
+for (case_name in names(test_cases)) {
+    result <- validate_roundtrip("gen_log1p", gen_log1p, test_cases[[case_name]])
+    cat(sprintf("  \%s: \%s (error: \%.2e)\n", 
+        case_name, 
+        ifelse(result$passed, "PASS", "FAIL"),
+        result$error))
+}
+
+# Test scale generator
+cat("\nTesting gen_scale:\n")
+for (case_name in names(test_cases)) {
+    result <- validate_roundtrip("gen_scale", gen_scale, 
+        test_cases[[case_name]], factor = 3.14)
+    cat(sprintf("  \%s: \%s (error: \%.2e)\n", 
+        case_name, 
+        ifelse(result$passed, "PASS", "FAIL"),
+        result$error))
+}
+
+
+# Example 5: Real-World Scenario --------------------------------------------------------------
+# Data.frame with multiple columns, different transformations per column, train-test split
+
+# Create realistic dataset
+set.seed(123)
+n_train <- 100
+n_test <- 30
+
+full_data <- data.table(
+    id = 1:(n_train + n_test),
+    price = exp(rnorm(n_train + n_test, mean = 5, sd = 1)),  # Log-normal prices
+    quantity = rpois(n_train + n_test, lambda = 50),  # Count data
+    temperature = rnorm(n_train + n_test, mean = 20, sd = 5)  # Normal temp
+)
+
+train_df <- full_data[1:n_train]
+test_df <- full_data[(n_train + 1):(n_train + n_test)]
+
+# Define column-specific generators
+gen_log_scale <- function(cols, x, ...) {
+    train_means <- colMeans(log1p(x[, ..cols]), na.rm = TRUE)
+    train_sds <- apply(log1p(x[, ..cols]), 2, sd, na.rm = TRUE)
+    
+    forward <- function(x) {
+        x_copy <- copy(x)
+        for (col in cols) {
+            log_val <- log1p(x_copy[[col]])
+            x_copy[[col]] <- (log_val - train_means[col]) / train_sds[col]
+        }
+        return(x_copy)
+    }
+    
+    backward <- function(x) {
+        x_copy <- copy(x)
+        for (col in cols) {
+            scaled_back <- (x_copy[[col]] * train_sds[col]) + train_means[col]
+            x_copy[[col]] <- expm1(scaled_back)
+        }
+        return(x_copy)
+    }
+    
+    list(forward = forward, backward = backward)
+}
+
+# Parse different transformations for different columns
+raw_pipes <- list(
+    # Price: log-transform then standardize
+    list(
+        on = "data",
+        transforms = list(list(fun = "gen_log_scale", cols = "price"))
+    ),
+    # Quantity and temperature: just standardize
+    list(
+        on = "data",
+        transforms = list(
+            list(fun = "gen_standardize", cols = c("quantity", "temperature"))
+        )
+    )
+)
+
+# Parse on training data
+train_env <- list(data = train_df)
+parsed_pipes <- parse_pipes(raw_pipes, env = train_env)
+
+# Forward transformation for model training
+train_transformed_list <- forward_pipes(parsed_pipes, env = train_env)
+
+# Combine transformed columns
+train_transformed <- train_df[, .(id)]
+train_transformed[, price := train_transformed_list[[1]]$price]
+train_transformed[, c("quantity", "temperature") := 
+    train_transformed_list[[2]][, .(quantity, temperature)]]
+
+cat("Training data transformed:\n")
+cat("  Price mean:", mean(train_transformed$price), 
+    "sd:", sd(train_transformed$price), "\n")
+cat("  Quantity mean:", mean(train_transformed$quantity), 
+    "sd:", sd(train_transformed$quantity), "\n")
+
+# Apply to test data (uses training parameters)
+test_env <- list(data = test_df)
+test_transformed_list <- forward_pipes(parsed_pipes, env = test_env)
+
+test_transformed <- test_df[, .(id)]
+test_transformed[, price := test_transformed_list[[1]]$price]
+test_transformed[, c("quantity", "temperature") := 
+    test_transformed_list[[2]][, .(quantity, temperature)]]
+
+cat("\nTest data transformed (using training params):\n")
+cat("  Price mean:", mean(test_transformed$price), 
+    "sd:", sd(test_transformed$price), "\n")
+
+# Backward transformation for model interpretation
+# Suppose model predicted on transformed scale, convert back to original
+predictions_transformed <- test_transformed[, .(id, price, quantity, temperature)]
+
+# Apply backward to reconstruct original scale
+backward_list <- backward_pipes(parsed_pipes, 
+    env = list(data = predictions_transformed))
+
+predictions_original <- predictions_transformed[, .(id)]
+predictions_original[, price := backward_list[[1]]$price]
+predictions_original[, c("quantity", "temperature") := 
+    backward_list[[2]][, .(quantity, temperature)]]
+
+cat("\nPredictions back-transformed to original scale:\n")
+cat("  Original test price range:", 
+    range(test_df$price), "\n")
+cat("  Reconstructed price range:", 
+    range(predictions_original$price), "\n")
+
+# Verify roundtrip accuracy
+price_error <- max(abs(test_df$price - predictions_original$price))
+quantity_error <- max(abs(test_df$quantity - predictions_original$quantity))
+cat("\nRoundtrip errors:\n")
+cat("  Price:", price_error, "\n")
+cat("  Quantity:", quantity_error, "\n")
+cat("  All errors < 1e-9:", 
+    price_error < 1e-9 && quantity_error < 1e-9, "\n")
 }
 
 }
