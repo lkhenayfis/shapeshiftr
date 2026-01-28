@@ -91,6 +91,19 @@
 #' ensures that each transformation is applied in sequence, with each one receiving the output of 
 #' the previous one as input.
 #' 
+#' ### Closure Wrapping for Reversibility
+#' 
+#' Generator results are automatically wrapped in `shapeshiftr_closure` objects to enable
+#' reversible transformations. This wrapping is transparent to existing code:
+#' 
+#' - **Single-closure generators**: The returned closure becomes the `forward` transformation,
+#'   and an identity function `function(x) x` is used as the `backward` transformation
+#' - **Paired-closure generators**: Generators can return a list of two closures
+#'   `list(forward, backward)` for explicitly reversible transformations
+#' - **Chaining**: During parse, only the `forward` closure is used for sequential chaining
+#' - **Backward compatibility**: The wrapping is handled by the constructor and maintains
+#'   compatibility with all existing single-closure generators
+#' 
 #' ## Stateless vs Trainable Transformations
 #' 
 #' For the sake of clarity, transformations can be classified into two categories: stateless and 
@@ -143,7 +156,7 @@
 #' 
 #' # Parse: creates closure (no training needed)
 #' parsed <- parse_single_pipe(raw_pipe)
-#' print(parsed$transforms[[1]](simple_dt_date))
+#' print(parsed$transforms[[1]]$forward(simple_dt_date))
 #' 
 #' # Example 2: Stacking transformations -----------------------------------------------------------
 #' 
@@ -194,7 +207,7 @@
 #' )
 #' 
 #' parsed <- parse_single_pipe(raw_pipe)
-#' print(parsed$transforms[[1]](simple_dt_date))
+#' print(parsed$transforms[[1]]$forward(simple_dt_date))
 #' 
 #' # Example 4: Using environments to control scope ------------------------------------------------
 #' 
@@ -223,7 +236,7 @@
 #' parsed <- parse_single_pipe(raw_pipe, env = data_list, enclos = env)
 #' 
 #' # exactly the same as previous example
-#' print(parsed$transforms[[1]](data_list$dt))
+#' print(parsed$transforms[[1]]$forward(data_list$dt))
 #' 
 #' @export
 
@@ -235,15 +248,17 @@ parse_single_pipe <- function(raw_pipe, env = parent.frame(), enclos = parent.fr
 
     cc <- c(l_t[[1]], args)
     cc[[1]] <- str2lang(cc[[1]])
-    raw_pipe$transforms[[1]] <- eval(as.call(cc), env, enclos)
+    result <- eval(as.call(cc), env, enclos)
+    raw_pipe$transforms[[1]] <- new_shapeshiftr_closure(result)
 
     if (length(l_t) >= 2) {
-        x <- eval(as.call(c(list(raw_pipe$transforms[[1]]), args)), env, enclos)
+        x <- eval(as.call(c(list(raw_pipe$transforms[[1]]$forward), args)), env, enclos)
         for (i in seq_along(l_t)[-1]) {
             cc <- c(l_t[[i]], list(x = x))
             cc[[1]] <- str2lang(cc[[1]])
-            raw_pipe$transforms[[i]] <- eval(as.call(cc), env, enclos)
-            x <- eval(as.call(c(list(raw_pipe$transforms[[i]]), list(x = x))), env, enclos)
+            result <- eval(as.call(cc), env, enclos)
+            raw_pipe$transforms[[i]] <- new_shapeshiftr_closure(result)
+            x <- eval(as.call(c(list(raw_pipe$transforms[[i]]$forward), list(x = x))), env, enclos)
         }
     }
 
@@ -432,7 +447,7 @@ parse_pipes <- function(raw_pipes, env = parent.frame(), enclos = parent.frame()
 #' parsed <- parse_single_pipe(raw_pipe, env = data_list_train)
 #' 
 #' # Extract and print captured training parameters for verification
-#' closure <- parsed$transforms[[1]]
+#' closure <- parsed$transforms[[1]]$forward
 #' closure_env <- environment(closure)
 #' train_means <- get("train_means", closure_env)
 #' train_sds <- get("train_sds", closure_env)
@@ -572,8 +587,8 @@ parse_pipes <- function(raw_pipes, env = parent.frame(), enclos = parent.frame()
 #' )
 #' parsed <- parse_single_pipe(raw_pipe, env = data_list)
 #' 
-#' # Extract closure from parsed pipe
-#' closure <- parsed$transforms[[1]]
+#' # Extract forward closure from parsed pipe
+#' closure <- parsed$transforms[[1]]$forward
 #' 
 #' # Access closure's environment to see captured parameters
 #' closure_env <- environment(closure)
@@ -668,13 +683,15 @@ eval_single_pipe <- function(pipe, env = parent.frame(), enclos = parent.frame()
 
     l_t <- pipe$transforms
 
-    cc <- c(list(l_t[[1]]), args)
+    first_fn <- if (inherits(l_t[[1]], "shapeshiftr_closure")) l_t[[1]]$forward else l_t[[1]]
+    cc <- c(list(first_fn), args)
     x <- eval(as.call(cc), env, enclos)
     l_t[[1]] <- NULL
 
     if (length(l_t) >= 1) {
         for (f in l_t) {
-            cc <- list(f, x)
+            fn <- if (inherits(f, "shapeshiftr_closure")) f$forward else f
+            cc <- list(fn, x)
             x <- eval(as.call(cc), env, enclos)
         }
     }
