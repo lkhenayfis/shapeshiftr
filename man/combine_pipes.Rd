@@ -7,7 +7,7 @@
 combine_pipes(evals, combine_fun = default_combine, ...)
 }
 \arguments{
-\item{evals}{list of elements to be combined, typically the result of \code{eval_pipes}}
+\item{evals}{list of elements to be combined, typically the result of \code{forward_pipes}}
 
 \item{combine_fun}{combination function to be applied, by default \code{default_combine}. See
 Details}
@@ -18,7 +18,7 @@ Details}
 result of the combination
 }
 \description{
-Combines outputs from pipes resulting from a call to \code{eval_pipes}
+Combines outputs from pipes resulting from a call to \code{forward_pipes}
 }
 \details{
 \subsection{Default Merge Behavior}{
@@ -84,7 +84,7 @@ raw_pipes <- list(
 parsed <- parse_pipes(raw_pipes)
 
 # Evaluate pipes
-evals <- eval_pipes(parsed)
+evals <- forward_pipes(parsed)
 
 # Combine with default merge
 combined <- combine_pipes(evals)
@@ -117,7 +117,7 @@ print(head(combined_custom))
 }
 \seealso{
 \itemize{
-\item \code{\link{eval_pipes}} for creating evaluation results to combine
+\item \code{\link{forward_pipes}} for creating evaluation results to combine
 \item \code{\link{parse_pipes}} for creating multiple pipes
 }
 }

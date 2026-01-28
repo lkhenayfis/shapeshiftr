@@ -348,7 +348,7 @@ eval_pipes <- function(pipes, env = parent.frame(), enclos = parent.frame()) {
 
 #' Combination of Pipe Results
 #' 
-#' Combines outputs from pipes resulting from a call to `eval_pipes`
+#' Combines outputs from pipes resulting from a call to `forward_pipes`
 #' 
 #' @details
 #' ## Default Merge Behavior
@@ -376,7 +376,7 @@ eval_pipes <- function(pipes, env = parent.frame(), enclos = parent.frame()) {
 #' `default_combine` is merely a call to `merge` using `by = 1`, that is, merging all
 #' data in `evals` by the first column of each one.
 #' 
-#' @param evals list of elements to be combined, typically the result of `eval_pipes`
+#' @param evals list of elements to be combined, typically the result of `forward_pipes`
 #' @param combine_fun combination function to be applied, by default `default_combine`. See
 #'     Details
 #' @param ... additional arguments to be passed to `combine_fun`
@@ -384,7 +384,7 @@ eval_pipes <- function(pipes, env = parent.frame(), enclos = parent.frame()) {
 #' @return result of the combination
 #' 
 #' @seealso
-#' * \code{\link{eval_pipes}} for creating evaluation results to combine
+#' * \code{\link{forward_pipes}} for creating evaluation results to combine
 #' * \code{\link{parse_pipes}} for creating multiple pipes
 #' 
 #' @examples
@@ -422,7 +422,7 @@ eval_pipes <- function(pipes, env = parent.frame(), enclos = parent.frame()) {
 #' parsed <- parse_pipes(raw_pipes)
 #' 
 #' # Evaluate pipes
-#' evals <- eval_pipes(parsed)
+#' evals <- forward_pipes(parsed)
 #' 
 #' # Combine with default merge
 #' combined <- combine_pipes(evals)

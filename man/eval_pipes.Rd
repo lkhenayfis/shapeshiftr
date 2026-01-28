@@ -2,29 +2,29 @@
 % Please edit documentation in R/pipes.r
 \name{eval_pipes}
 \alias{eval_pipes}
-\title{Evaluate List of Pipes}
+\title{Internal Helper for Evaluating Multiple Pipes}
 \usage{
 eval_pipes(pipes, env = parent.frame(), enclos = parent.frame())
 }
 \arguments{
-\item{pipes}{list of pipes already parsed by \code{parse_pipes}}
+\item{pipes}{List of pipes with raw function closures}
 
-\item{env}{environment where the pipe will be evaluated}
+\item{env}{Environment for evaluation}
 
-\item{enclos}{enclosing environment for evaluation of the closures}
+\item{enclos}{Enclosing environment for closures}
 }
 \value{
-list of results from applying each pipe to its defined data
+List of transformed data
 }
 \description{
-\strong{Deprecated}: Use \code{\link{forward_pipes}} instead.
-
-Simple wrapper for looping \code{eval_single_pipe} over multiple pipes
+Internal function that applies \code{eval_single_pipe()} to multiple pipes.
+Not intended for direct use. Use \code{\link{forward_pipes}} or
+\code{\link{backward_pipes}} instead.
 }
 \seealso{
 \itemize{
-\item \code{\link{forward_pipes}} (recommended replacement)
-\item \code{\link{eval_single_pipe}} for details on parse-eval separation
-\item \code{\link{parse_pipes}} for creating multiple parsed pipes
+\item \code{\link{forward_pipes}} for applying forward transformations
+\item \code{\link{backward_pipes}} for applying backward transformations
 }
 }
+\keyword{internal}
