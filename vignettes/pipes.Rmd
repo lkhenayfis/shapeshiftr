@@ -949,3 +949,1224 @@ cat("Box-Cox applies training lambda to test data\n")
 - Combine multiple transformations with closure composition (Section 6)
 
 Next, we'll learn how to **write custom closure generators** for domain-specific transformations (Section 5).
+
+## Custom Closure Generators
+
+Section 4 demonstrated 5 common transformation types using the pipes framework. Now we'll learn how to **write your own custom generators** for domain-specific transformations.
+
+**When to write custom generators**:
+
+- Domain-specific business logic (regulatory adjustments, industry conventions)
+- Novel feature engineering (interaction terms, rolling statistics)
+- Temporal transformations (differencing, smoothing, seasonality)
+- Custom preprocessing (missing value imputation strategies)
+
+**Design philosophy**: Custom generators follow the same CORRECT closure pattern you learned in Sections 2-4. You're extending the framework, not inventing new patterns.
+
+### Design Principles for Custom Generators
+
+When creating custom generators, follow these principles:
+
+**1. Choose Trainable vs Stateless**:
+
+- **Trainable**: Computes parameters from training data (means, quantiles, levels, optimal hyperparameters)
+- **Stateless**: Applies deterministic transformation (log, differencing, fixed window operations)
+
+**2. Signature Convention**:
+
+- Always include `x` parameter (training data, may be unused for stateless)
+- Always include `...` parameter (interface consistency)
+- Put configurable parameters as named arguments before `x`
+
+**3. Closure Return**:
+
+- Closure accepts single argument `x` (current data)
+- Closure returns transformed data (typically copy of input)
+- Use `copy(x)` to avoid modifying original data
+
+**4. Column Naming**:
+
+- Generated columns should have descriptive suffixes (`_ma`, `_diff`, `_lag1`)
+- Use `paste0()` for programmatic naming
+- Document naming convention in roxygen comments if exported
+
+**5. NA Handling**:
+
+- Decide on NA propagation strategy (remove, carry forward, special value)
+- Document behavior clearly
+- Be consistent across your generators
+
+**6. Input Validation**:
+
+- Check column existence in training data
+- Validate parameter ranges (window > 0)
+- Fail fast with clear error messages
+
+### Generator 1: Moving Average Smoother
+
+**Pattern**: Trainable (could optimize window from ACF, simplified to fixed window)
+
+**Purpose**: Smooth time series with rolling mean using training window size
+
+**Implementation**:
+
+```{r gen_moving_avg}
+gen_moving_avg <- function(cols, window = 3, x, ...) {
+    if (window < 1) {
+        stop("window must be at least 1")
+    }
+
+    missing_cols <- setdiff(cols, names(x))
+    if (length(missing_cols) > 0) {
+        stop("Columns not found: ", paste(missing_cols, collapse = ", "))
+    }
+
+    function(x) {
+        x_copy <- copy(x)
+
+        for (col in cols) {
+            new_col <- paste0(col, "_ma", window)
+            x_copy[[new_col]] <- frollmean(
+                x_copy[[col]],
+                n = window,
+                align = "right",
+                na.rm = TRUE
+            )
+        }
+
+        x_copy
+    }
+}
+```
+
+**Demo**:
+
+```{r demo_moving_avg}
+library(shapeshiftr)
+library(data.table)
+data(simple_dt_date)
+
+train <- simple_dt_date[1:15]
+test <- simple_dt_date[16:20]
+
+data_env_train <- list(data = train)
+
+pipe_ma <- list(
+    on = "data",
+    transforms = list(
+        list(fun = "gen_moving_avg", cols = "X1", window = 3)
+    )
+)
+
+parsed_ma <- parse_single_pipe(pipe_ma, env = data_env_train)
+
+train_smoothed <- eval_single_pipe(parsed_ma, env = data_env_train)
+
+# Original vs smoothed (training):
+print(head(train[, .(date, X1)], 8))
+
+cat("\n")
+print(head(train_smoothed[, .(date, X1, X1_ma3)], 8))
+
+# Apply to test data
+data_env_test <- list(data = test)
+test_smoothed <- eval_single_pipe(parsed_ma, env = data_env_test)
+
+# Test data smoothed with same window:
+print(head(test_smoothed[, .(date, X1, X1_ma3)], 5))
+
+cat("\nMoving average with 3-day window applied consistently\n")
+```
+
+**Key Points**:
+
+- Uses `frollmean()` from data.table for efficiency
+- Creates new column (preserves original)
+- NA handling via `na.rm = TRUE`
+- Right-aligned (uses past values only)
+
+### Generator 2: Lag-Based Differencing
+
+**Pattern**: Stateless (differencing is deterministic)
+
+**Purpose**: Compute first differences for stationarity
+
+**Implementation**:
+
+```{r gen_difference}
+gen_difference <- function(cols, lag = 1, x, ...) {
+    if (lag < 1) {
+        stop("lag must be at least 1")
+    }
+
+    missing_cols <- setdiff(cols, names(x))
+    if (length(missing_cols) > 0) {
+        stop("Columns not found: ", paste(missing_cols, collapse = ", "))
+    }
+
+    function(x) {
+        x_copy <- copy(x)
+
+        for (col in cols) {
+            new_col <- paste0(col, "_diff", lag)
+            x_copy[[new_col]] <- c(
+                rep(NA, lag),
+                diff(x_copy[[col]], lag = lag)
+            )
+        }
+
+        x_copy
+    }
+}
+```
+
+**Demo**:
+
+```{r demo_difference}
+library(shapeshiftr)
+library(data.table)
+data(simple_dt_date)
+
+train <- simple_dt_date[1:15]
+test <- simple_dt_date[16:20]
+
+data_env_train <- list(data = train)
+
+pipe_diff <- list(
+    on = "data",
+    transforms = list(
+        list(fun = "gen_difference", cols = "Y", lag = 1)
+    )
+)
+
+parsed_diff <- parse_single_pipe(pipe_diff, env = data_env_train)
+
+train_diffed <- eval_single_pipe(parsed_diff, env = data_env_train)
+
+# Original vs differenced (training):
+print(head(train[, .(date, Y)], 8))
+
+cat("\n")
+print(head(train_diffed[, .(date, Y, Y_diff1)], 8))
+
+# Verification: Y_diff1[i] = Y[i] - Y[i-1]
+cat(sprintf("\nVerification: Y[2] - Y[1] = %g - %g = %g\n",
+        train$Y[2], train$Y[1], train$Y[2] - train$Y[1]))
+cat(sprintf("Expected Y_diff1[2] = %g\n", train_diffed$Y_diff1[2]))
+
+# Apply to test data
+data_env_test <- list(data = test)
+test_diffed <- eval_single_pipe(parsed_diff, env = data_env_test)
+
+# Test data differenced:
+print(head(test_diffed[, .(date, Y, Y_diff1)], 5))
+
+cat("\nStateless differencing applied consistently\n")
+```
+
+**Key Points**:
+
+- First `lag` values are NA (no previous values)
+- Stateless: no training needed
+- Useful for stationarity in time series
+- Can chain with scaling (difference → scale)
+
+### Generator 3: Interaction Terms
+
+**Pattern**: Trainable (could select based on correlation/VIF, simplified to all pairs)
+
+**Purpose**: Create polynomial/interaction features with training-based selection
+
+**Implementation**:
+
+```{r gen_interactions}
+gen_interactions <- function(cols, degree = 2, x, ...) {
+    if (degree != 2) {
+        stop("Only degree = 2 (pairwise) currently supported")
+    }
+
+    missing_cols <- setdiff(cols, names(x))
+    if (length(missing_cols) > 0) {
+        stop("Columns not found: ", paste(missing_cols, collapse = ", "))
+    }
+
+    if (length(cols) < 2) {
+        stop("Need at least 2 columns for interactions")
+    }
+
+    pairs <- combn(cols, 2, simplify = FALSE)
+
+    function(x) {
+        x_copy <- copy(x)
+
+        for (pair in pairs) {
+            new_col <- paste0(pair[1], "_x_", pair[2])
+            x_copy[[new_col]] <- x_copy[[pair[1]]] * x_copy[[pair[2]]]
+        }
+
+        x_copy
+    }
+}
+```
+
+**Demo**:
+
+```{r demo_interactions}
+library(shapeshiftr)
+library(data.table)
+data(simple_dt_date)
+
+train <- simple_dt_date[1:15]
+test <- simple_dt_date[16:20]
+
+data_env_train <- list(data = train)
+
+pipe_interact <- list(
+    on = "data",
+    transforms = list(
+        list(fun = "gen_interactions", cols = c("X1", "X2", "X3"), degree = 2)
+    )
+)
+
+parsed_interact <- parse_single_pipe(pipe_interact, env = data_env_train)
+
+train_interact <- eval_single_pipe(parsed_interact, env = data_env_train)
+
+# New interaction columns:
+new_cols <- setdiff(names(train_interact), names(train))
+cat(sprintf("Interaction columns created: %s\n\n", paste(new_cols, collapse = ", ")))
+
+# Show values (training):
+print(head(train_interact[, .(date, X1, X2, X1_x_X2)], 5))
+
+# Verification: X1_x_X2 = X1 * X2
+cat(sprintf("\nVerification: X1[1] * X2[1] = %g * %g = %g\n",
+        train$X1[1], train$X2[1], train$X1[1] * train$X2[1]))
+cat(sprintf("Expected X1_x_X2[1] = %g\n", train_interact$X1_x_X2[1]))
+
+# Apply to test data
+data_env_test <- list(data = test)
+test_interact <- eval_single_pipe(parsed_interact, env = data_env_test)
+
+# Test data interactions:
+print(head(test_interact[, .(date, X1, X2, X1_x_X2)], 5))
+
+cat("\nSame interaction terms created on test data\n")
+```
+
+**Key Points**:
+
+- Creates all pairwise interactions
+- Could be trainable (select via correlation)
+- Useful for capturing non-linear relationships
+- Can create many features (consider regularization)
+
+### Pattern Reuse from Section 4
+
+Your custom generators follow the same patterns you learned in Section 4:
+
+| Generator | Type | Pattern from Section 4 | Key Similarity |
+|-----------|------|------------------------|----------------|
+| `gen_moving_avg` | Trainable* | `gen_scale_cols` | Captures parameter (window) in closure |
+| `gen_difference` | Stateless | `gen_log_transform` | No training needed, deterministic operation |
+| `gen_interactions` | Trainable* | `gen_one_hot` | Could select based on training data |
+
+*Simplified versions shown; production would make them fully trainable
+
+**CORRECT Closure Pattern** (all 3 follow this):
+
+1. Generator body: Validate inputs, optionally compute parameters from `x`
+2. Return closure: Accepts `x`, applies transformation using captured parameters/config
+3. No parse/eval branching: Separation is architectural (parse vs eval functions)
+
+### Testing Custom Generators
+
+When developing custom generators, test:
+
+**1. Standalone Function**:
+
+```r
+# Test generator returns a function
+closure <- gen_moving_avg(cols = "X1", window = 3, x = train)
+stopifnot(is.function(closure))
+
+# Test closure application
+result <- closure(train)
+stopifnot("X1_ma3" %in% names(result))
+```
+
+**2. Parse-Eval Workflow**:
+
+```r
+# Test parse phase
+parsed <- parse_single_pipe(
+    list(on = "data", transforms = list(list(fun = "gen_moving_avg", cols = "X1", window = 3))),
+    env = list(data = train)
+)
+
+# Test eval phase
+train_result <- eval_single_pipe(parsed, env = list(data = train))
+test_result <- eval_single_pipe(parsed, env = list(data = test))
+```
+
+**3. Edge Cases**:
+
+```r
+# Test with NA values
+train_na <- copy(train)
+train_na[1, X1 := NA]
+result_na <- closure(train_na)
+# Verify NA handling
+
+# Test with single row
+result_single <- closure(train[1])
+# Verify doesn't error
+```
+
+**4. Consistency**:
+
+```r
+# Verify train and test produce same structure
+stopifnot(all(names(train_result) == names(test_result)))
+
+# Verify parameter capture
+closure_env <- environment(parsed$transforms[[1]])
+# Extract and verify captured parameters
+```
+
+## Advanced Patterns
+
+Sections 1-5 covered the fundamentals of closure-based transformations. Now we explore **advanced patterns for production workflows**:
+
+- **Chaining**: Composing multiple transformations in sequence
+- **Debugging**: Inspecting closure environments to verify parameter capture
+- **Serialization**: Best practices for saving and loading parsed pipes
+- **Performance**: Optimization strategies for large datasets
+
+These patterns enable production-ready pipelines while maintaining the train-test consistency guarantee.
+
+### Chaining Multiple Transformations
+
+A single pipe can apply **multiple transformations in sequence**. Each transformation receives the output of the previous one.
+
+**Example: Log → Scale Pipeline**
+
+```{r chaining_example}
+library(shapeshiftr)
+library(data.table)
+data(simple_dt_date)
+
+# Ensure positive values for log transform
+simple_dt_date[, Y := Y + abs(min(Y)) + 1]
+
+train <- simple_dt_date[1:15]
+test <- simple_dt_date[16:20]
+
+data_env_train <- list(data = train)
+
+# Define chained transformations
+raw_pipe_chained <- list(
+    on = "data",
+    transforms = list(
+        list(fun = "gen_log_transform", cols = "Y", offset = 0),
+        list(fun = "gen_scale_cols", cols = c("Y", "X1", "X2"))
+    )
+)
+
+# Parse: log parameters (none), then scale parameters (computed from log(Y))
+parsed_chained <- parse_single_pipe(raw_pipe_chained, env = data_env_train)
+
+# Eval on train: log(Y) then scale
+train_chained <- eval_single_pipe(parsed_chained, env = data_env_train)
+
+# Show results:
+cat(sprintf("Original Y[1]: %g\nLogged: %g\nLogged+Scaled: %g\n\n",
+        train$Y[1],
+        log(train$Y[1]),
+        train_chained$Y[1]))
+
+# Verification: scaling is on logged values
+log_Y <- log(train$Y)
+mean_log_Y <- mean(log_Y)
+sd_log_Y <- sd(log_Y)
+expected_scaled <- (log(train$Y[1]) - mean_log_Y) / sd_log_Y
+
+cat(sprintf("Expected (manual): %g\nGot (pipeline): %g\nMatch: %s\n\n",
+        expected_scaled,
+        train_chained$Y[1],
+        all.equal(expected_scaled, train_chained$Y[1])))
+
+# Eval on test: same transformations
+data_env_test <- list(data = test)
+test_chained <- eval_single_pipe(parsed_chained, env = data_env_test)
+
+# Test Y is log-transformed with TRAINING mean/sd of log(Y)
+cat(sprintf("Test Y[1] original: %g\nTest Y[1] log+scaled: %g\n",
+        test$Y[1], test_chained$Y[1]))
+
+cat("\nOrder matters: log THEN scale produces different result than scale THEN log\n")
+```
+
+**Key Insights**:
+
+- **Order dependency**: Log → Scale ≠ Scale → Log
+- **Parameter capture**: Scale learns from log-transformed training data
+- **Consistency maintained**: Test uses same log + training mean/sd from log(Y)
+- **Single pipe**: Both transforms in one parse-eval workflow
+
+### The `x` argument in closures
+
+As has been described and reinforced in all examples, every closure has a single argument `x` on
+which it operates. In our illustrative examples `x` is a single data.table, but more complex
+scenarios are naturally supported by the framework. For example, you could write a closure that
+accepts multiple data.tables as a list via `x`, or a more complex object that contains several
+different objects.
+
+In "Combining Multiple Transformations" we mentioned that even combining separate pipe results could
+be itself a pipe. Here we expand on that
+
+```{r x_arg_as_list}
+raw_pipes_transform <- list(
+    list(
+        on = "data_first_half",
+        transforms = list(
+            list(fun = "gen_standardize", cols = c("X1", "X2"))
+        )
+    ),
+    list(
+        on = "data_second_half",
+        transforms = list(
+            list(fun = "gen_standardize", cols = c("X1", "X2"))
+        )
+    )
+)
+
+data_list <- list(
+    data_first_half = simple_dt_date[1:10],
+    data_second_half = simple_dt_date[11:20]
+)
+
+parsed_transform <- parse_pipes(raw_pipes_transform, env = data_list)
+result_transform <- eval_pipes(parsed_transform, env = data_list)
+
+gen_combiner <- function(combine_fun, ...) {
+    function(x) {
+        combine_pipes(x, combine_fun = combine_fun)
+    }
+}
+
+raw_pipe_combine <- list(
+    on = "result",
+    transforms = list(
+        list(fun = "gen_combiner", combine_fun = rbind)
+    )
+)
+
+parsed_combine <- parse_single_pipe(raw_pipe_combine, env = list(result = result_transform))
+result_final <- eval_single_pipe(parsed_combine, env = list(result = result_transform))
+```
+
+So long as the closure you write accepts a single argument `x`, you can design it to handle
+more complex data structures as needed. Here we use `combine_pipes()` which is a simple `Reduce`
+wrapper over `combine_fun`, but more diverse logic could be implemented as needed.
+
+### Transformation Order Matters
+
+Different orders produce different results:
+
+| Order | Result | Use When |
+|-------|--------|----------|
+| **Log → Scale** | Scale parameters learned from log(Y) | Variance stabilization before standardization |
+| **Scale → Log** | Log applied to scaled values (can produce negatives!) | Generally not recommended |
+| **Winsorize → Scale** | Outliers clipped before computing mean/sd | Robust scaling |
+| **Scale → Winsorize** | Winsorization on already-scaled data | Less common |
+
+**Rule of Thumb**:
+
+1. Transform distributions first (log, Box-Cox)
+2. Handle outliers second (winsorize)
+3. Standardize last (scale)
+
+This order ensures parameters are computed on appropriately transformed data.
+
+### Debugging Closure Environments
+
+Closures capture parameters in their environment. You can **inspect these environments** to verify correctness, audit models, or prepare for serialization.
+
+**Example: Extracting Captured Parameters**
+
+```{r debugging_closures}
+library(shapeshiftr)
+library(data.table)
+data(simple_dt_date)
+
+train <- simple_dt_date[1:15]
+
+# Parse a standardization pipe
+parsed <- parse_single_pipe(
+    list(
+        on = "data",
+        transforms = list(
+            list(fun = "gen_scale_cols", cols = c("X1", "X2"))
+        )
+    ),
+    env = list(data = train)
+)
+
+# Extract the closure
+closure <- parsed$transforms[[1]]
+
+# Access closure's environment
+closure_env <- environment(closure)
+
+# List all captured variables:
+cat(sprintf("Variables in closure environment: %s\n\n",
+        paste(ls(closure_env), collapse = ", ")))
+
+# Extract specific parameters
+train_means <- get("train_means", closure_env)
+train_sds <- get("train_sds", closure_env)
+
+# Show captured values:
+cat(sprintf("Captured mean X1: %g\nCaptured sd X1: %g\n\n",
+        train_means["X1"], train_sds["X1"]))
+
+# Verify against manual computation
+manual_mean <- mean(train$X1, na.rm = TRUE)
+manual_sd <- sd(train$X1, na.rm = TRUE)
+
+cat(sprintf("Manual mean X1: %g\nManual sd X1: %g\n\n",
+        manual_mean, manual_sd))
+
+cat(sprintf("Match: %s\n", all.equal(manual_mean, train_means["X1"])))
+```
+
+**Use Cases for Environment Inspection**:
+
+1. **Debugging**: Verify parameters were computed correctly during parse
+2. **Auditing**: Understand what the model learned from training data
+3. **Serialization**: Extract parameters for storage or transmission
+4. **Testing**: Validate closure behavior matches expectations
+5. **Documentation**: Record training statistics for reports
+
+**Caution**: Accessing closure internals is advanced usage. For most workflows, trust the parse-eval workflow without inspection.
+
+### Serialization Best Practices
+
+Parsed pipes can be **saved and loaded** for reuse. However, closures capture their entire environment, which can include large objects.
+
+**Problem: Unnecessary Capture**
+
+```r
+# BAD: Captures entire training dataset unnecessarily
+gen_scale_bad <- function(cols, x, ...) {
+    train_means <- colMeans(x[, ..cols], na.rm = TRUE)
+    train_sds <- apply(x[, ..cols], 2, sd, na.rm = TRUE)
+
+    # x is still in closure environment even though not needed!
+    function(x) {
+        x_copy <- copy(x)
+        for (col in cols) {
+            x_copy[[col]] <- (x_copy[[col]] - train_means[col]) / train_sds[col]
+        }
+        x_copy
+    }
+}
+
+# Closure environment contains:
+# - train_means (needed)
+# - train_sds (needed)
+# - x (NOT needed - entire training dataset!)
+# - cols (needed)
+```
+
+**Solution: Explicit Cleanup**
+
+```r
+# GOOD: Removes unnecessary data from environment
+gen_scale_good <- function(cols, x, ...) {
+    train_means <- colMeans(x[, ..cols], na.rm = TRUE)
+    train_sds <- apply(x[, ..cols], 2, sd, na.rm = TRUE)
+
+    # Remove training data from environment
+    rm(x)
+
+    # Closure environment now contains only:
+    # - train_means (needed)
+    # - train_sds (needed)
+    # - cols (needed)
+    function(x) {
+        x_copy <- copy(x)
+        for (col in cols) {
+            x_copy[[col]] <- (x_copy[[col]] - train_means[col]) / train_sds[col]
+        }
+        x_copy
+    }
+}
+```
+
+**Best Practices**:
+
+1. **Remove training data**: Use `rm(x)` after parameter computation
+2. **Keep only essentials**: Only capture parameters needed by closure
+3. **Test deserialization**: Load in fresh R session and verify
+4. **Check size**: `object.size(parsed)` should be small (KB, not MB)
+5. **Version control**: Include R version and package versions in metadata
+
+### Performance Optimization
+
+For large datasets or complex pipelines, consider these optimization strategies:
+
+**1. Use data.table Efficiently**
+
+```r
+# For simple operations, use vectorized data.table syntax
+gen_add_offset <- function(cols, offset, ...) {
+    function(x) {
+        x_copy <- copy(x)
+        x_copy[, (cols) := lapply(.SD, function(col) col + offset), .SDcols = cols]
+        x_copy
+    }
+}
+```
+
+**2. Vectorize When Possible**
+
+Avoid explicit loops when data.table can vectorize the operation
+
+**3. Profile Before Optimizing**
+
+```r
+# Use Rprof() to identify bottlenecks
+Rprof("pipe_profile.out")
+result <- eval_single_pipe(parsed, env = list(data = large_data))
+Rprof(NULL)
+summaryRprof("pipe_profile.out")
+```
+
+**4. Parallel Evaluation for Multiple Pipes**
+
+```r
+# If you have multiple INDEPENDENT pipes, evaluate in parallel
+library(parallel)
+
+parsed_pipes <- parse_pipes(list_of_raw_pipes, env = data_env)
+
+# Parallel eval
+results <- mclapply(parsed_pipes, eval_single_pipe,
+                   env = data_env, mc.cores = 4)
+```
+
+**Performance Summary**:
+
+- **data.table operations**: Use `:=` and vectorized operations for efficiency
+- **Vectorization**: Avoid explicit loops when data.table can vectorize
+- **Memory**: Remove unused objects with `rm()`, use `copy()` judiciously
+- **Profiling**: Measure before optimizing (don't guess)
+- **Parallelization**: Only for independent pipes (not chained transforms)
+
+### Key Takeaways
+
+**Chaining**:
+
+- Multiple transformations in single pipe via `transforms` list
+- Order matters: log → scale ≠ scale → log
+- Each transform receives output of previous
+
+**Debugging**:
+
+- Access closure environment with `environment(closure)`
+- Extract captured parameters with `get("param_name", closure_env)`
+- Use for verification, auditing, serialization prep
+
+**Serialization**:
+
+- Remove unnecessary data with `rm(x)` after parameter computation
+- Test deserialization in fresh session
+- Check serialized size with `object.size()`
+
+**Performance**:
+
+- Use data.table operations efficiently (`:=`, vectorized operations)
+- Vectorize when possible
+- Profile before optimizing
+- Parallelize independent pipes, not chained transforms
+
+**Production Readiness**:
+
+These patterns prepare your pipelines for deployment. Section 7 adds temporal slicing, and Section 8 demonstrates a complete end-to-end pipeline.
+
+## Integration with Slicing
+
+Data transformation (pipes) and temporal feature creation (slicing) are **complementary systems** in shapeshiftr. This section shows how to combine them for complete forecasting workflows.
+
+**Two systems, one goal**:
+
+- **Pipes**: Transform data while maintaining train-test consistency (scale, encode, winsorize)
+- **Slicing**: Create temporal features while maintaining train-test consistency (lags, windows, leads)
+
+**Integration patterns** (both valid):
+
+- **Transform → Slice**: Apply transformations first, then create temporal features from transformed data
+- **Slice → Transform**: Create temporal features first, then transform them using pipe system
+
+**Pattern choice is situation-dependent** — this section demonstrates both approaches to help you choose the right one for your use case.
+
+For comprehensive coverage of the slicing system, see `vignette("slicing")`. This section focuses on **integration patterns**.
+
+### Pattern 1: Transform → Slice
+
+This pattern applies transformations **before** temporal slicing:
+
+1. **Parse transformations** on training data (learn parameters)
+2. **Eval transformations** on train and test (apply parameters)
+3. **Slice transformed data** to create lag features
+
+**Use when**: You want lags/windows of transformed features (e.g., lags of scaled values)
+
+**Example: Scale → Lag Pipeline**
+
+```{r integration_workflow}
+library(shapeshiftr)
+library(data.table)
+data(simple_dt_date)
+
+train <- copy(simple_dt_date[1:15])
+test <- copy(simple_dt_date[16:20])
+
+# STEP 1: Parse transformation on training data
+data_env_train <- list(data = train)
+
+raw_pipe_scale <- list(
+    on = "data",
+    transforms = list(
+        list(fun = "gen_scale_cols", cols = c("X1", "X2"))
+    )
+)
+
+parsed_scale <- parse_single_pipe(raw_pipe_scale, env = data_env_train)
+
+# STEP 2: Eval transformation on training data
+train_scaled <- eval_single_pipe(parsed_scale, env = data_env_train)
+
+# Training data is now scaled:
+cat(sprintf("Original X1[1]: %g\nScaled X1[1]: %g\n\n",
+        train$X1[1], train_scaled$X1[1]))
+
+# STEP 3: Slice scaled data to create lags
+train_final <- slice(
+    train_scaled,
+    variables = c("X1", "X2"),
+    walk_on = "date",
+    slice_on = "date",
+    L = list(X1 = -seq(3), X2 = -seq(3))
+)
+
+train_final_dt <- as.data.table(train_final)
+
+# Result: Scaled features + lags of scaled features
+cat(sprintf("Columns created: %s\n\n",
+        paste(names(train_final_dt), collapse = ", ")))
+
+# Show first few rows (lags of scaled X1):
+print(head(train_final_dt[, .(index, X1_1, X1_2, X1_3)], 6))
+
+# STEP 4: Apply same workflow to test data
+data_env_test <- list(data = test)
+
+# Same transformation (training parameters)
+test_scaled <- eval_single_pipe(parsed_scale, env = data_env_test)
+
+# Same slicing specification
+test_final <- slice(
+    test_scaled,
+    variables = c("X1", "X2"),
+    walk_on = "date",
+    slice_on = "date",
+    L = list(X1 = -seq(3), X2 = -seq(3))
+)
+
+test_final_dt <- as.data.table(test_final)
+
+# Test data: scaled with TRAINING params, then lagged
+print(head(test_final_dt[, .(index, X1_1)], 3))
+
+cat("\nKey insight: Lags are of SCALED features (not raw features)\n")
+```
+
+**Pattern Characteristics**:
+
+- Lags capture transformed relationships (e.g., lags of scaled values)
+- Transformation happens once, then slicing can be done multiple times
+- Cleaner separation: transformation logic separate from temporal logic
+
+**Train-Test Consistency**:
+
+- ✅ Scaling uses training mean/sd on both train and test
+- ✅ Slicing specification identical for train and test
+- ✅ Model sees same feature engineering in train and production
+
+In the above example, the slicing is done explicitly after the pipes part for illustration
+purpurses. In practice, you can encapsulate the entire workflow in a single  pipeline for
+convenience.
+
+```{r gen_slicer}
+gen_slicer <- function(variables, walk_on, slice_on, L, x, ...) {
+    function(x) {
+        sliced <- slice(
+            x,
+            variables = variables,
+            walk_on = walk_on,
+            slice_on = slice_on,
+            L = L
+        )
+        as.data.table(sliced)
+    }
+}
+```
+
+```{r integration_workflow_2}
+library(shapeshiftr)
+library(data.table)
+data(simple_dt_date)
+
+train <- copy(simple_dt_date[1:15])
+test <- copy(simple_dt_date[16:20])
+
+data_env_train <- list(data = train)
+
+raw_pipe_scale <- list(
+    on = "data",
+    transforms = list(
+        list(fun = "gen_scale_cols", cols = c("X1", "X2")),
+        list(fun = "gen_slicer",
+            variables = c("X1", "X2"),
+            walk_on = "date",
+            slice_on = "date",
+            L = list(X1 = -seq(3), X2 = -seq(3))
+        )
+    )
+)
+
+parsed_scale <- parse_single_pipe(raw_pipe_scale, env = data_env_train)
+
+train_final_dt <- eval_single_pipe(parsed_scale, env = data_env_train)
+```
+
+### Pattern 2: Slice → Transform
+
+This pattern creates temporal features **before** applying transformations:
+
+1. **Slice raw data** to create temporal features
+2. **Parse transformations** on sliced training data
+3. **Eval transformations** on train and test
+
+**Use when**: You want to apply complex transformations to temporal slices using `slice_artifact` methods and pipe integration.
+
+**Key advantage**: Combines the power of `slice_artifact` methods (summary, dwt, etc.) with the pipe system for flexible feature engineering.
+
+#### Example 1: Lag Summary Statistics
+
+The `summary.slice_artifact` method computes descriptive statistics across temporal slices. Integrating this with pipes enables feature generation that would be cumbersome with `data.table::frollapply` (which requires scalar outputs).
+
+```{r slice_transform_summary}
+library(shapeshiftr)
+library(data.table)
+data(simple_dt_date)
+
+# Generator function: creates lag summary statistics
+gen_lag_stats <- function(lags, var, x, ...) {
+    function(x) {
+        # Create slice object with specified lags
+        slices <- slice(
+            x,
+            variables = var,
+            walk_on = "date",
+            slice_on = "date",
+            L = -lags
+        )
+
+        # Use summary method to compute statistics
+        desc_stats <- summary(slices)
+
+        # Return as data.table for pipe integration
+        as.data.table(desc_stats)
+    }
+}
+
+# Define pipe with slice → transform pattern
+raw_pipe <- list(
+    on = "data",
+    transforms = list(
+        list(fun = "gen_lag_stats", lags = 1:5, var = "X1")
+    )
+)
+
+# Parse and evaluate
+data_env <- list(data = simple_dt_date)
+parsed_pipe <- parse_single_pipe(raw_pipe, env = data_env)
+result <- eval_single_pipe(parsed_pipe, env = data_env)
+
+# Show summary statistics computed from lags 1-5
+print(result[1:5, .(index, min, mean, median, max)])
+
+cat("\nKey insight: summary() computes multiple statistics across temporal slices\n")
+cat("Using frollapply would require separate passes for each statistic\n")
+```
+
+**Why this pattern**:
+
+- `summary.slice_artifact` returns multiple statistics (min, mean, median, max, etc.) from temporal slices
+- `data.table::frollapply` requires scalar output from `FUN` — computing multiple statistics would need multiple separate passes
+- Pipe integration makes this pattern reusable and train-test consistent
+
+#### Example 2: Discrete Wavelet Transform on Slices
+
+The `dwt.slice_artifact` method applies wavelet decomposition to temporal windows. This demonstrates a transformation that would be extremely cumbersome with multiple `frollapply` passes.
+
+```{r slice_transform_dwt}
+library(shapeshiftr)
+library(data.table)
+data(simple_dt_date)
+
+# Generator function: applies DWT to temporal slices
+gen_dwt_slices <- function(window_size, var, filter = "haar", x, ...) {
+    function(x) {
+        # Create slice object with rolling window
+        slices <- slice(
+            x,
+            variables = var,
+            walk_on = "date",
+            slice_on = "date",
+            L = -seq_len(window_size)
+        )
+
+        # Apply DWT to each window
+        dwt_result <- dwt(slices, filter = filter)
+
+        # Return as data.table for pipe integration
+        as.data.table(dwt_result)
+    }
+}
+
+# Define pipe with DWT transformation
+raw_pipe <- list(
+    on = "data",
+    transforms = list(
+        list(fun = "gen_dwt_slices", window_size = 8, var = "X1", filter = "haar")
+    )
+)
+
+# Parse and evaluate
+data_env <- list(data = simple_dt_date)
+parsed_pipe <- parse_single_pipe(raw_pipe, env = data_env)
+result <- eval_single_pipe(parsed_pipe, env = data_env)
+
+# DWT produces wavelet coefficients at multiple levels
+print(result[1:5, .SD, .SDcols = 1:5])
+
+cat("\nKey insight: DWT applies successive filters over temporal windows\n")
+cat("This would be extremely cumbersome and error-prone with frollapply\n")
+```
+
+**Why this pattern**:
+
+- DWT applies multiple successive filters to temporal data
+- `slice_artifact` methods provide direct access to window-based transformations
+- Pipe integration ensures train-test consistency for complex feature engineering
+
+**Pattern Characteristics**:
+
+- Direct engineering of features based on temporal windows
+- Leverages `slice_artifact` S3 methods (summary, dwt, mean, median, etc.)
+- More efficient than multiple rolling window passes
+- Train-test consistency through pipe parse/eval pattern
+
+**Train-Test Consistency**:
+
+- ✅ Slicing specification deterministic (no parameters to learn)
+- ✅ Same generator function applied to train and test
+- ✅ Model sees same temporal feature engineering pipeline
+
+### Key Takeaways
+
+**Two Integration Patterns**:
+
+- **Transform → Slice**: Transform first, then create temporal features
+  - Use when: You want lags/windows of transformed values
+  - Example: Lags of scaled features
+  
+- **Slice → Transform**: Create temporal features first, then transform
+  - Use when: You want to leverage `slice_artifact` methods in pipes
+  - Example: Summary statistics or DWT on temporal windows
+
+**Pattern Choice**:
+
+- **No universal "best" pattern** — choice depends on your feature engineering needs
+- Both patterns maintain train-test consistency
+- Transform → Slice: Simpler when transformations are standard (scale, encode)
+- Slice → Transform: More powerful when using `slice_artifact` methods (summary, dwt, etc.)
+
+**Cross-System Consistency**:
+
+- Pipes: Transformation parameters learned from training data
+- Slicing: Deterministic temporal operations
+- Combined: Complete train-test consistency guarantee
+
+**Integration Workflow**:
+
+1. **Pattern 1 (Transform → Slice)**:
+   - Parse/eval transformations on train/test
+   - Apply identical slicing specification to both
+   
+2. **Pattern 2 (Slice → Transform)**:
+   - Create generator function using `slice()` and `slice_artifact` methods
+   - Integrate with pipe system via parse/eval
+   - Apply same generator to train and test
+
+**For More on Slicing**: See `vignette("slicing")` for:
+
+- Comprehensive coverage of `slice()` function
+- All available `slice_artifact` methods
+- Window-based features, leads, multi-key slicing
+
+**Next**: Section 8 demonstrates a complete end-to-end forecasting pipeline combining multiple transformations and slicing strategies.
+
+## Complete Forecasting Pipeline
+
+This section demonstrates a **complete, production-ready forecasting pipeline** combining all concepts from Sections 1-7:
+
+- Categorical encoding (one-hot)
+- Outlier handling (winsorization)
+- Feature scaling (standardization)
+- Temporal features (lag creation via slicing)
+- Train-test consistency (throughout)
+
+**Business Problem**:
+
+You're building a daily sales forecasting model for a retail store. Your data includes:
+
+- **Numeric features**: Temperature (X1), foot traffic (X2), inventory levels (X3)
+- **Categorical features**: Day type (weekday/weekend)
+- **Target**: Daily sales (Y)
+
+**Requirements**:
+
+1. Encode categorical variables for model compatibility
+2. Handle outliers in numeric features (temperature, foot traffic can spike)
+3. Standardize features for model training
+4. Create 3-day lag features to capture temporal patterns
+5. Maintain strict train-test consistency (prevent data leakage)
+
+**Result**: Model-ready data.table ready for regression, tree models, or neural networks.
+
+### The Complete Pipeline
+
+**Pipeline Overview**:
+
+1. Train-test split
+2. Define transformation pipeline (encode, winsorize, scale)
+3. Parse transformations on training data (learn parameters)
+4. Evaluate transformations on training data
+5. Create lag features via slicing
+6. Apply same pipeline to test data
+7. Verify consistency
+
+**Full Implementation**:
+
+```{r complete_pipeline}
+library(shapeshiftr)
+library(data.table)
+data(simple_dt_date)
+
+# === STEP 1: TRAIN-TEST SPLIT ===
+
+train <- copy(simple_dt_date[1:15])
+test <- copy(simple_dt_date[16:20])
+
+# Ensure categorical columns are factors
+train[, day_type := as.factor(day_type)]
+test[, day_type := as.factor(day_type)]
+
+cat(sprintf("Training observations: %d\nTest observations: %d\n\n", nrow(train), nrow(test)))
+
+# === STEP 2: DEFINE TRANSFORMATION PIPELINE ===
+
+raw_pipe <- list(
+    on = "data",
+    transforms = list(
+        # Transform 1: One-hot encode day_type
+        list(fun = "gen_one_hot", col = "day_type", drop_first = TRUE),
+
+        # Transform 2: Winsorize outliers in X1, X2
+        list(fun = "gen_winsorize", cols = c("X1", "X2"),
+            lower = 0.1, upper = 0.9),
+
+        # Transform 3: Scale numeric features
+        list(fun = "gen_scale_cols", cols = c("X1", "X2", "X3", "Y")),
+
+        # Final transform: Slicer
+        list(fun = "gen_slicer", 
+            variables = c("X1", "X2", "Y", "day_type_weekend"), walk_on = "date", slice_on = "date",
+            L = list(X1 = -seq(3), X2 = -seq(3), Y = -seq(2), day_type_weekend = 0)
+        )
+    )
+)
+
+# === STEP 3: PARSE TRANSFORMATIONS ON TRAINING DATA ===
+# This is where parameters are LEARNED from training data
+
+data_env_train <- list(data = train)
+parsed_pipe <- parse_single_pipe(raw_pipe, env = data_env_train)
+
+cat("Transformations parsed (parameters learned from training data)\n\n")
+
+# === STEP 4: EVALUATE TRANSFORMATIONS ON TRAINING DATA ===
+# Apply learned transformations to training data
+
+train_final_dt <- eval_single_pipe(parsed_pipe, env = data_env_train)
+
+# Final training data:
+cat(sprintf("Final training features: %d columns\n", ncol(train_final_dt)))
+cat(sprintf("Features: %s\n\n",
+        paste(setdiff(names(train_final_dt), "index"), collapse = ", ")))
+
+# Show sample (first 6 rows, subset of columns):
+# Note: day_type_weekend becomes day_type_weekend_1 (L=0 creates _1 suffix)
+print(train_final_dt[1:6, .(index, day_type_weekend_1, X1_1, X1_2, Y_1)])
+
+# === STEP 6: APPLY SAME PIPELINE TO TEST DATA ===
+# Use SAME parsed pipe (training parameters) on test data
+
+test_final_dt <- eval_single_pipe(parsed_pipe, env = list(data = test))
+
+# Final test data:
+cat(sprintf("Final test features: %d columns\n\n", ncol(test_final_dt)))
+
+# Show sample:
+print(test_final_dt[1:3, .(index, day_type_weekend_1, X1_1, X1_2, Y_1)])
+
+# === STEP 7: VERIFY TRAIN-TEST CONSISTENCY ===
+
+# Consistency check 1: Same columns
+cat(sprintf("Train and test have same columns: %s\n",
+        all(names(train_final_dt) == names(test_final_dt))))
+
+# Consistency check 2: One-hot encoding consistent
+cat(sprintf("Train day_type_weekend_1 values: %s\n",
+        paste(unique(train_final_dt$day_type_weekend_1), collapse = ", ")))
+cat(sprintf("Test day_type_weekend_1 values: %s\n\n",
+        paste(unique(test_final_dt$day_type_weekend_1), collapse = ", ")))
+
+# Consistency check 3: Scaling used training parameters
+# Test mean is NOT 0 (proof it used training mean/sd)
+cat(sprintf("Test X1_1 mean: %g (NOT 0 - correctly uses training parameters)\n",
+        round(mean(test_final_dt$X1_1, na.rm = TRUE), 4)))
+
+# Consistency check 4: Same lag structure
+lag_cols_train <- grep("_[0-9]+$", names(train_final_dt), value = TRUE)
+lag_cols_test <- grep("_[0-9]+$", names(test_final_dt), value = TRUE)
+cat(sprintf("Train lag columns: %d\nTest lag columns: %d\nMatch: %s\n\n",
+        length(lag_cols_train), length(lag_cols_test),
+        all(lag_cols_train == lag_cols_test)))
+```
