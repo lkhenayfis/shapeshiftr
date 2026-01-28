@@ -17,9 +17,7 @@ eval_single_pipe(pipe, env = parent.frame(), enclos = parent.frame())
 Transformed data
 }
 \description{
-Internal function that applies a sequence of transformation closures.
-Not intended for direct use. Use \code{\link{forward_single_pipe}} or
-\code{\link{backward_single_pipe}} instead.
+Internal function that applies a sequence of transformation closures, not intended for direct use
 }
 \details{
 This function expects \code{pipe$transforms} to contain raw function

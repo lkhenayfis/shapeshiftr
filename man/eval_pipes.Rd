@@ -17,9 +17,7 @@ eval_pipes(pipes, env = parent.frame(), enclos = parent.frame())
 List of transformed data
 }
 \description{
-Internal function that applies \code{eval_single_pipe()} to multiple pipes.
-Not intended for direct use. Use \code{\link{forward_pipes}} or
-\code{\link{backward_pipes}} instead.
+Internal wrapper that loops \code{eval_single_pipe()} to multiple pipes, not intended for direct use
 }
 \seealso{
 \itemize{
