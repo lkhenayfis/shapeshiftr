@@ -6,4 +6,5 @@
 ^\.github$
 ^doc$
 ^Meta$
+^plans$
 ^\.vscode$

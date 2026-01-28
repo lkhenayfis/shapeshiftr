@@ -1,9 +1,16 @@
+# docs
+
+* Massive documentation enhancements
+  * detailed docs and examples for `pipes` system
+  * detailed docs and examples for `slice` and `slice_artifact`
+  * added two vignettes: one for slicing and one for pipes
+
 # pipes
 
 ## New features
 
-* Adiciona funcionalidade de `pipes` ao pacote para automatizacao de manipulacoes de dados na
-  geracao de regressores
+* Adds `pipes` system to the packaged, focused on automation of data manipulation for engeneering
+  features
 
 # shapeshiftr 0.3
 
