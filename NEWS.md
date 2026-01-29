@@ -1,3 +1,9 @@
+# rev-pipes
+
+## New features
+
+* Added support for reversible pipes -- See documentation and vignette for details
+
 # docs
 
 * Massive documentation enhancements
