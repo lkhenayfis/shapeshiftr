@@ -1,22 +1,13 @@
-# rev-pipes
-
-## New features
-
-* Added support for reversible pipes -- See documentation and vignette for details
-
-# docs
-
-* Massive documentation enhancements
-  * detailed docs and examples for `pipes` system
-  * detailed docs and examples for `slice` and `slice_artifact`
-  * added two vignettes: one for slicing and one for pipes
-
-# pipes
+# shapeshiftr 0.4
 
 ## New features
 
 * Adds `pipes` system to the packaged, focused on automation of data manipulation for engeneering
   features
+* Massive documentation enhancements
+  * detailed docs and examples for `slice` and `slice_artifact`
+  * detailed docs and examples for `pipes` system
+  * added two vignettes: one for slicing and one for pipes
 
 # shapeshiftr 0.3
 
