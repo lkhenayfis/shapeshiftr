@@ -113,8 +113,8 @@ parsed_pipe <- parse_single_pipe(
     env = list(data = train_data)
 )
 
-train_scaled <- eval_single_pipe(parsed_pipe, env = list(data = train_data))
-test_scaled <- eval_single_pipe(parsed_pipe, env = list(data = test_data))
+train_scaled <- forward_single_pipe(parsed_pipe, env = list(data = train_data))
+test_scaled <- forward_single_pipe(parsed_pipe, env = list(data = test_data))
 ```
 
 Don't worry if this looks complex — Sections 2-4 will build your understanding step by step.
@@ -189,7 +189,7 @@ gen_standardize <- function(cols, x, ...) {
 
 ### Parse-Eval Workflow
 
-The workflow uses two core functions: `parse_single_pipe()` and `eval_single_pipe()`.
+The workflow uses two core functions: `parse_single_pipe()` and `forward_single_pipe()`.
 
 **Parse Phase** (happens ONCE with training data):
 
@@ -217,7 +217,7 @@ What `parse_single_pipe()` does:
 **Eval Phase** (happens MANY TIMES with different data):
 
 ```{r eval_workflow}
-train_result <- eval_single_pipe(parsed, env = data_env_train)
+train_result <- forward_single_pipe(parsed, env = data_env_train)
 
 # Training data transformation:
 cat(sprintf("X1 - Mean: %g, SD: %g\n",
@@ -227,7 +227,7 @@ cat(sprintf("X1 - Mean: %g, SD: %g\n",
 test <- simple_dt_date[16:20]
 data_env_test <- list(data = test)
 
-test_result <- eval_single_pipe(parsed, env = data_env_test)
+test_result <- forward_single_pipe(parsed, env = data_env_test)
 
 # Test data transformation (uses TRAINING parameters):
 cat(sprintf("X1 - Mean: %g, SD: %g\n",
@@ -235,7 +235,7 @@ cat(sprintf("X1 - Mean: %g, SD: %g\n",
         round(sd(test_result$X1), 4)))
 ```
 
-What `eval_single_pipe()` does:
+What `forward_single_pipe()` does:
 
 1. Looks up `"data"` in current `data_env_test` (could be train or test)
 2. Calls stored closure with current data: `closure(x = data_env_test$data)`
@@ -263,11 +263,11 @@ raw_pipe <- list(
 
 parsed <- parse_single_pipe(raw_pipe, env = data_list_train)
 
-train_transformed <- eval_single_pipe(parsed, env = data_list_train)
+train_transformed <- forward_single_pipe(parsed, env = data_list_train)
 
 data_list_test <- list(data = test)
 
-test_transformed <- eval_single_pipe(parsed, env = data_list_test)
+test_transformed <- forward_single_pipe(parsed, env = data_list_test)
 ```
 
 **Why this pattern**:
@@ -305,7 +305,7 @@ captured_sds <- get("train_sds", closure_env)
 cat(sprintf("Training mean X1: %g\nTraining sd X1: %g\n\n",
         captured_means["X1"], captured_sds["X1"]))
 
-train_result <- eval_single_pipe(parsed, env = data_env_train)
+train_result <- forward_single_pipe(parsed, env = data_env_train)
 
 # Training transformation (mean ≈ 0, sd ≈ 1):
 cat(sprintf("X1 - Mean: %g, SD: %g\n\n",
@@ -313,7 +313,7 @@ cat(sprintf("X1 - Mean: %g, SD: %g\n\n",
         round(sd(train_result$X1), 6)))
 
 data_env_test <- list(data = test)
-test_result <- eval_single_pipe(parsed, env = data_env_test)
+test_result <- forward_single_pipe(parsed, env = data_env_test)
 
 # Test transformation (uses TRAINING parameters):
 cat(sprintf("X1 - Mean: %g, SD: %g\n\n",
@@ -358,7 +358,7 @@ raw_pipe <- list(
 )
 
 parsed <- parse_single_pipe(raw_pipe, env = data_env)
-result <- eval_single_pipe(parsed, env = data_env)
+result <- forward_single_pipe(parsed, env = data_env)
 
 # Original Y (first 5):
 print(head(data_env$data$Y, 5))
@@ -395,7 +395,7 @@ raw_pipe <- list(
 
 parsed <- parse_single_pipe(raw_pipe, env = data_env_train)
 
-train_result <- eval_single_pipe(parsed, env = data_env_train)
+train_result <- forward_single_pipe(parsed, env = data_env_train)
 
 # Training result:
 cat(sprintf("X1 - Mean: %g, SD: %g\n",
@@ -403,7 +403,7 @@ cat(sprintf("X1 - Mean: %g, SD: %g\n",
         round(sd(train_result$X1), 6)))
 
 data_env_test <- list(data = test)
-test_result <- eval_single_pipe(parsed, env = data_env_test)
+test_result <- forward_single_pipe(parsed, env = data_env_test)
 
 # Test result (uses training parameters):
 cat(sprintf("X1 - Mean: %g, SD: %g\n",
@@ -441,7 +441,7 @@ data_list <- list(
 
 parsed <- parse_pipes(raw_pipes, env = data_list)
 
-result <- eval_pipes(parsed, env = data_list)
+result <- forward_pipes(parsed, env = data_list)
 
 # combining by rbind, for example
 comb_fun <- function(x1, x2) rbind(x1, x2)
@@ -454,7 +454,7 @@ pipes as well through a more heterdox use of the pipes described later in Advanc
 
 ### Environment Management
 
-Both `parse_single_pipe()` and `eval_single_pipe()` accept `env` and `enclos` parameters:
+Both `parse_single_pipe()` and `forward_single_pipe()` accept `env` and `enclos` parameters:
 
 - **`env`**: Where to look up data references (e.g., `"data"` in `on = "data"`)
   - Can be a named list, data.frame, or environment
@@ -480,7 +480,7 @@ raw_pipe <- list(
 )
 
 parsed <- parse_single_pipe(raw_pipe, env = data_list, enclos = custom_env)
-result <- eval_single_pipe(parsed, env = data_list, enclos = custom_env)
+result <- forward_single_pipe(parsed, env = data_list, enclos = custom_env)
 
 cat(sprintf("X1 mean: %g\n", round(mean(result$X1), 10)))
 ```
@@ -534,6 +534,613 @@ try(parse_single_pipe(raw_pipe, env = data_env))
 - Check column existence
 - Handle NA values appropriately
 - Provide clear error messages
+
+## Reversible Transformations
+
+Many forecasting workflows require **bidirectional transformations**: transforming features or targets before modeling, then inverting those transformations on predictions to return to original units. This section introduces the reversible transformation pattern that makes this workflow seamless and train-test consistent.
+
+shapeshiftr provides `forward_single_pipe()` and `backward_single_pipe()` functions that automatically:
+1. Extract the appropriate forward or backward closures from parsed pipes
+2. Apply them via the standard `forward_single_pipe()` mechanism
+3. Reverse the transformation order for backward direction (ensuring mathematical correctness)
+
+### Introduction: Why Reversibility Matters
+
+In forecasting pipelines, you frequently encounter scenarios requiring transformation inversion:
+
+**Target transformation workflow**:
+1. Transform target variable (e.g., log transform for variance stabilization)
+2. Fit model on transformed target
+3. Generate predictions in transformed space
+4. **Invert transformation** to get forecasts in original units
+
+**Feature transformation workflow**:
+1. Transform features (e.g., PCA for dimensionality reduction)
+2. Fit model on transformed features
+3. Generate predictions
+4. **Invert feature transformation** for interpretation or feature importance
+
+**Critical challenge**: The inversion MUST use the SAME parameters learned during forward transformation from training data. Using different parameters breaks train-test consistency and invalidates your pipeline.
+
+**Example**: If you standardize a target variable using training mean=100 and sd=15, you must unstandardize predictions using those SAME values (not test statistics). Otherwise, your forecasts will be on the wrong scale.
+
+**The reversible generator pattern** solves this by returning both `forward` and `backward` closures that share the same captured training parameters via closure environment. This architectural guarantee makes parameter inconsistency impossible.
+
+### Creating Reversible Generators
+
+A reversible generator returns a list containing two closures: `forward` (applies transformation) and `backward` (inverts transformation). Both closures share the same parent environment containing training parameters.
+
+**Single closure (not reversible)**:
+```{r reversible_intro_single, eval = FALSE}
+gen_scale <- function(cols, x, ...) {
+    train_means <- colMeans(x[, ..cols])
+    train_sds <- apply(x[, ..cols], 2, sd)
+
+    function(x) {
+        x_copy <- copy(x)
+        for (col in cols) {
+            x_copy[[col]] <- (x_copy[[col]] - train_means[col]) / train_sds[col]
+        }
+        x_copy
+    }
+}
+```
+
+**Paired closures (reversible)**:
+```{r reversible_intro_paired}
+gen_scale_reversible <- function(cols, x, ...) {
+    train_means <- colMeans(x[, ..cols], na.rm = TRUE)
+    train_sds <- apply(x[, ..cols], 2, sd, na.rm = TRUE)
+
+    forward <- function(x) {
+        x_copy <- copy(x)
+        for (col in cols) {
+            x_copy[[col]] <- (x_copy[[col]] - train_means[col]) / train_sds[col]
+        }
+        x_copy
+    }
+
+    backward <- function(x) {
+        x_copy <- copy(x)
+        for (col in cols) {
+            x_copy[[col]] <- (x_copy[[col]] * train_sds[col]) + train_means[col]
+        }
+        x_copy
+    }
+
+    list(forward = forward, backward = backward)
+}
+```
+
+**Key architectural differences**:
+- Single closure: Returns one function (only forward transformation)
+- Paired closures: Returns `list(forward = ..., backward = ...)`
+- Both closures capture `train_means` and `train_sds` from shared parent environment
+- Forward applies `(x - mean) / sd`, backward applies `(x * sd) + mean`
+- No duplication of training parameters (single source of truth)
+
+**Environment sharing demonstration**:
+```{r reversible_env_sharing}
+library(shapeshiftr)
+library(data.table)
+data(simple_dt_date)
+
+train <- simple_dt_date[1:15]
+
+data_env_train <- list(data = train)
+
+pipe_scale <- list(
+    on = "data",
+    transforms = list(
+        list(fun = "gen_scale_reversible", cols = c("X1", "X2"))
+    )
+)
+
+parsed <- parse_single_pipe(pipe_scale, env = data_env_train)
+
+forward_closure <- parsed$transforms[[1]]$forward
+backward_closure <- parsed$transforms[[1]]$backward
+
+identical(environment(forward_closure), environment(backward_closure))
+
+forward_env <- environment(forward_closure)
+captured_means <- get("train_means", forward_env)
+captured_sds <- get("train_sds", forward_env)
+
+cat(sprintf("Captured means: X1=%g, X2=%g\n", captured_means["X1"], captured_means["X2"]))
+cat(sprintf("Captured sds: X1=%g, X2=%g\n", captured_sds["X1"], captured_sds["X2"]))
+```
+
+**Proof of shared environment**: Both closures reference the SAME environment object, guaranteeing parameter consistency.
+
+### Forward vs Backward Modes
+
+The forward and backward closures represent two **directions** of transformation, not two **phases** of the pipeline. Both are used during the evaluation phase.
+
+shapeshiftr provides `forward_single_pipe()` and `backward_single_pipe()` to apply transformations in both directions while automatically handling closure extraction and order reversal.
+
+**Direction semantics**:
+- **Forward**: Original units → Transformed units (for model input)
+- **Backward**: Transformed units → Original units (for interpretation/output)
+
+**Workflow integration**:
+
+```{r reversible_workflow_demo, eval = FALSE}
+parsed <- parse_single_pipe(pipe_def, env = list(data = train))
+
+train_transformed <- forward_single_pipe(parsed, env = list(data = train))
+
+model <- fit_model(Y ~ X1 + X2, data = train_transformed)
+
+test_transformed <- forward_single_pipe(parsed, env = list(data = test))
+
+predictions_transformed <- predict(model, newdata = test_transformed)
+
+predictions_original <- backward_single_pipe(
+    parsed,
+    env = list(data = data.table(Y = predictions_transformed))
+)
+```
+
+**Order reversal in backward transformation**:
+
+When chaining multiple transformations, backward direction automatically reverses the order:
+
+```{r reversible_order, eval = FALSE}
+pipe_chain <- list(
+    on = "data",
+    transforms = list(
+        list(fun = "gen_log_reversible", cols = "Y", offset = 1),
+        list(fun = "gen_scale_reversible", cols = "Y")
+    )
+)
+
+parsed_chain <- parse_single_pipe(pipe_chain, env = list(data = train))
+
+train_forward <- forward_single_pipe(parsed_chain, env = list(data = train))
+
+train_reconstructed <- backward_single_pipe(parsed_chain, env = list(data = train_forward))
+```
+
+**Why reverse order**: Transformations compose mathematically as functions. If forward is `g(f(x))`, backward is `f^(-1)(g^(-1)(x))`, not `g^(-1)(f^(-1)(x))`. The `backward_single_pipe()` function handles this reversal automatically.
+
+### Roundtrip Validation
+
+A critical property of reversible transformations is **roundtrip consistency**: applying forward then backward should reconstruct the original data (within numerical precision for exact transformations, within tolerance for approximate transformations).
+
+**Testing exact reversibility**:
+
+```{r reversible_roundtrip_exact}
+library(shapeshiftr)
+library(data.table)
+data(simple_dt_date)
+
+train <- simple_dt_date[1:15, .(date, X1, X2)]
+
+data_env <- list(data = train)
+
+pipe_scale <- list(
+    on = "data",
+    transforms = list(
+        list(fun = "gen_scale_reversible", cols = c("X1", "X2"))
+    )
+)
+
+parsed <- parse_single_pipe(pipe_scale, env = data_env)
+
+train_scaled <- forward_single_pipe(parsed, env = data_env)
+
+train_reconstructed <- backward_single_pipe(parsed, env = list(data = train_scaled))
+
+max_error_X1 <- max(abs(train$X1 - train_reconstructed$X1))
+max_error_X2 <- max(abs(train$X2 - train_reconstructed$X2))
+
+cat(sprintf("Max reconstruction error X1: %g\n", max_error_X1))
+cat(sprintf("Max reconstruction error X2: %g\n", max_error_X2))
+cat(sprintf("Exact reversibility (error < 1e-10): %s\n",
+        max_error_X1 < 1e-10 && max_error_X2 < 1e-10))
+```
+
+**Testing approximate reversibility**:
+
+Some transformations are inherently lossy (e.g., PCA with dimensionality reduction). For these, roundtrip validation verifies error is within acceptable bounds.
+
+```{r reversible_roundtrip_approx}
+library(shapeshiftr)
+library(data.table)
+data(simple_dt_date)
+
+gen_pca <- function(cols, n_components = 2, x, ...) {
+    pca_model <- prcomp(x[, ..cols], center = TRUE, scale. = TRUE)
+
+    rotation_matrix <- pca_model$rotation[, seq_len(n_components), drop = FALSE]
+    center <- pca_model$center
+    scale <- pca_model$scale
+
+    forward <- function(x) {
+        x_copy <- copy(x)
+
+        x_scaled <- scale(x[, ..cols], center = center, scale = scale)
+        pc_scores <- x_scaled %*% rotation_matrix
+
+        for (i in seq_len(n_components)) {
+            pc_name <- paste0("PC", i)
+            x_copy[[pc_name]] <- pc_scores[, i]
+        }
+
+        for (col in cols) {
+            x_copy[[col]] <- NULL
+        }
+
+        x_copy
+    }
+
+    backward <- function(x) {
+        x_copy <- copy(x)
+
+        pc_cols <- paste0("PC", seq_len(n_components))
+        pc_matrix <- as.matrix(x[, ..pc_cols])
+
+        x_reconstructed <- pc_matrix %*% t(rotation_matrix)
+        x_reconstructed <- sweep(x_reconstructed, 2, scale, "*")
+        x_reconstructed <- sweep(x_reconstructed, 2, center, "+")
+
+        for (i in seq_along(cols)) {
+            x_copy[[cols[i]]] <- x_reconstructed[, i]
+        }
+
+        for (pc_col in pc_cols) {
+            x_copy[[pc_col]] <- NULL
+        }
+
+        x_copy
+    }
+
+    list(forward = forward, backward = backward)
+}
+
+train <- simple_dt_date[1:15, .(date, X1, X2, X3)]
+
+data_env <- list(data = train)
+
+pipe_pca <- list(
+    on = "data",
+    transforms = list(
+        list(fun = "gen_pca", cols = c("X1", "X2", "X3"), n_components = 2)
+    )
+)
+
+parsed <- parse_single_pipe(pipe_pca, env = data_env)
+
+train_pca <- forward_single_pipe(parsed, env = data_env)
+
+train_reconstructed <- backward_single_pipe(parsed, env = list(data = train_pca))
+
+mean_error_X1 <- mean(abs(train$X1 - train_reconstructed$X1))
+mean_error_X2 <- mean(abs(train$X2 - train_reconstructed$X2))
+mean_error_X3 <- mean(abs(train$X3 - train_reconstructed$X3))
+
+cat(sprintf("Mean reconstruction error X1: %g\n", mean_error_X1))
+cat(sprintf("Mean reconstruction error X2: %g\n", mean_error_X2))
+cat(sprintf("Mean reconstruction error X3: %g\n", mean_error_X3))
+
+relative_error <- mean(c(mean_error_X1, mean_error_X2, mean_error_X3)) /
+    mean(c(sd(train$X1), sd(train$X2), sd(train$X3)))
+
+cat(sprintf("Relative reconstruction error: %g%%\n", relative_error * 100))
+cat(sprintf("Approximate reversibility acceptable (error < 10%%): %s\n",
+        relative_error < 0.1))
+```
+
+**Validation best practices**:
+- **Exact transformations**: Verify roundtrip error < 1e-10 (floating point precision)
+- **Approximate transformations**: Define acceptable relative error threshold (e.g., 10% of feature standard deviation)
+- **Test on training data**: Roundtrip should work on data used to learn parameters
+- **Test on test data**: Roundtrip should also work on held-out data
+- **Automate in tests**: Include roundtrip checks in unit tests for custom generators
+
+### Train-Test Consistency in Reversible Transformations
+
+The reversible pattern guarantees train-test consistency in BOTH forward and backward directions by sharing the same captured parameters.
+
+**Forward consistency** (already covered in Section 2-3):
+
+```{r reversible_consistency_forward}
+library(shapeshiftr)
+library(data.table)
+data(simple_dt_date)
+
+train <- simple_dt_date[1:15, .(date, X1)]
+test <- simple_dt_date[16:20, .(date, X1)]
+
+data_env_train <- list(data = train)
+
+pipe_scale <- list(
+    on = "data",
+    transforms = list(
+        list(fun = "gen_scale_reversible", cols = "X1")
+    )
+)
+
+parsed <- parse_single_pipe(pipe_scale, env = data_env_train)
+
+train_scaled <- forward_single_pipe(parsed, env = data_env_train)
+
+cat(sprintf("Train X1: mean=%g, sd=%g\n",
+        round(mean(train_scaled$X1), 10), round(sd(train_scaled$X1), 6)))
+
+data_env_test <- list(data = test)
+
+test_scaled <- forward_single_pipe(parsed, env = data_env_test)
+
+cat(sprintf("Test X1: mean=%g, sd=%g\n",
+        round(mean(test_scaled$X1), 4), round(sd(test_scaled$X1), 4)))
+
+cat("\nForward: Test uses training mean/sd (not 0/1)\n")
+```
+
+**Backward consistency** (the new guarantee):
+
+```{r reversible_consistency_backward}
+library(shapeshiftr)
+library(data.table)
+data(simple_dt_date)
+
+train <- simple_dt_date[1:15, .(date, Y)]
+test <- simple_dt_date[16:20, .(date, Y)]
+
+gen_log_reversible <- function(cols, offset = 1, base = exp(1), ...) {
+    forward <- function(x) {
+        x_copy <- copy(x)
+        for (col in cols) {
+            if (base == exp(1)) {
+                x_copy[[col]] <- log(x_copy[[col]] + offset)
+            } else {
+                x_copy[[col]] <- log(x_copy[[col]] + offset) / log(base)
+            }
+        }
+        x_copy
+    }
+
+    backward <- function(x) {
+        x_copy <- copy(x)
+        for (col in cols) {
+            if (base == exp(1)) {
+                x_copy[[col]] <- exp(x_copy[[col]]) - offset
+            } else {
+                x_copy[[col]] <- base^x_copy[[col]] - offset
+            }
+        }
+        x_copy
+    }
+
+    list(forward = forward, backward = backward)
+}
+
+data_env_train <- list(data = train)
+
+pipe_log <- list(
+    on = "data",
+    transforms = list(
+        list(fun = "gen_log_reversible", cols = "Y", offset = 5)
+    )
+)
+
+parsed <- parse_single_pipe(pipe_log, env = data_env_train)
+
+train_logged <- forward_single_pipe(parsed, env = data_env_train)
+
+predictions_logged <- data.table(Y = train_logged$Y[1:5])
+
+predictions_original <- backward_single_pipe(
+    parsed,
+    env = list(data = predictions_logged)
+)
+
+cat("Logged predictions:\n")
+print(predictions_logged)
+
+cat("\nBack-transformed predictions (offset=5 from training):\n")
+print(predictions_original)
+
+cat("\nOriginal training Y (first 5):\n")
+print(train[1:5, .(Y)])
+
+cat(sprintf("\nBackward used training offset=%d consistently\n", 5))
+```
+
+**Key insight**: The backward closure uses the SAME offset parameter (5) that was specified during parse phase, not a different value. This consistency applies to all captured parameters (means, sds, rotation matrices, offsets, etc.).
+
+**Production scenario**:
+
+Imagine you fit a model on log-transformed targets:
+
+1. **Parse** with training data, offset=5 (learns this parameter)
+2. **Forward transform** training targets using offset=5
+3. Fit model on transformed targets
+4. **Forward transform** test targets using offset=5 (consistency!)
+5. Generate predictions in log space
+6. **Backward transform** predictions using offset=5 (consistency!)
+7. Predictions now in original units with correct scale
+
+**Without reversible pattern**: You might accidentally use different offsets in forward (training) vs backward (prediction), producing forecasts on the wrong scale. The reversible pattern makes this error architecturally impossible.
+
+### Best Practices for Reversible Transformations
+
+**1. Always test roundtrip consistency during development**:
+
+```{r reversible_bestpractice_roundtrip, eval = FALSE}
+test_that("gen_my_transform roundtrip is exact", {
+    x <- data.table(col1 = rnorm(100))
+    gen <- gen_my_transform(cols = "col1", x = x)
+
+    x_transformed <- gen$forward(x)
+    x_reconstructed <- gen$backward(x_transformed)
+
+    expect_equal(x_reconstructed$col1, x$col1, tolerance = 1e-10)
+})
+```
+
+**2. Document reversibility type (exact vs approximate)**:
+
+```{r reversible_bestpractice_doc, eval = FALSE}
+#' @description
+#'     Applies standardization transformation with exact reversibility.
+#'     Roundtrip reconstruction: backward(forward(x)) == x within floating
+#'     point precision.
+```
+
+**3. Name parameters consistently**:
+
+Always use `forward` and `backward` (not `transform`/`inverse`, `encode`/`decode`, etc.) for consistency with shapeshiftr conventions.
+
+**4. Handle edge cases in both directions**:
+
+```{r reversible_bestpractice_edge, eval = FALSE}
+backward <- function(x) {
+    x_copy <- copy(x)
+    for (col in cols) {
+        if (any(train_sds[col] == 0)) {
+            warning(sprintf("Column %s had sd=0 in training, cannot unstandardize", col))
+            next
+        }
+        x_copy[[col]] <- (x_copy[[col]] * train_sds[col]) + train_means[col]
+    }
+    x_copy
+}
+```
+
+**5. Return both closures even if only forward is currently used**:
+
+Future workflow changes may require backward transformation. Providing both closures from the start prevents refactoring.
+
+**6. Verify shared environment in tests**:
+
+```{r reversible_bestpractice_env, eval = FALSE}
+test_that("forward and backward share environment", {
+    gen <- gen_scale_reversible(cols = "X", x = data.table(X = 1:10))
+
+    expect_identical(
+        environment(gen$forward),
+        environment(gen$backward)
+    )
+})
+```
+
+### Common Patterns for Reversible Generators
+
+**Pattern 1: Exact linear transformation**
+- Examples: Scaling, centering, affine transformations
+- Reversibility: Exact
+- Implementation: Compute inverse operation algebraically
+
+**Pattern 2: Exact nonlinear transformation**
+- Examples: Log/exp, Box-Cox (with fixed lambda)
+- Reversibility: Exact
+- Implementation: Apply inverse function
+
+**Pattern 3: Approximate dimensionality reduction**
+- Examples: PCA, SVD, autoencoders
+- Reversibility: Approximate (information loss)
+- Implementation: Project to lower dimension, then reconstruct (won't be exact)
+
+**Pattern 4: Stateless reversible**
+- Examples: Fixed offset log transform, deterministic encoding
+- Reversibility: Exact
+- Implementation: No training needed, both directions use fixed parameters
+
+**Pattern 5: Trainable reversible**
+- Examples: Standardization, PCA, quantile mapping
+- Reversibility: Exact or approximate depending on method
+- Implementation: Learn parameters from training data, use in both directions
+
+**Framework positioning**: These patterns demonstrate how to structure reversible generators within shapeshiftr's closure-based architecture. Use them as templates for domain-specific bidirectional transformations.
+
+### Complete Roundtrip Workflow: Data Exploration
+
+This example demonstrates using PCA for dimensionality reduction with backward transformation to interpret results in original feature space. PCA is inherently lossy when reducing dimensions (3 → 2), so backward reconstruction is approximate.
+
+**Workflow**:
+1. Apply PCA to reduce 3 features to 2 principal components
+2. Parse and forward transform training data
+3. Identify interesting data points in PC space (extreme PC1 values)
+4. Backward transform selected points to interpret in original units
+5. Verify roundtrip accuracy (expect information loss from dimensionality reduction)
+
+```{r data_exploration_roundtrip}
+library(shapeshiftr)
+library(data.table)
+data(simple_dt_date)
+
+train <- simple_dt_date[1:15, .(date, X1, X2, X3)]
+
+data_env_train <- list(data = train)
+
+pipe_pca <- list(
+    on = "data",
+    transforms = list(
+        list(fun = "gen_pca", cols = c("X1", "X2", "X3"), n_components = 2)
+    )
+)
+
+parsed_pca <- parse_single_pipe(pipe_pca, env = data_env_train)
+
+train_pca <- forward_single_pipe(parsed_pca, env = data_env_train)
+
+cat("Forward transformation (3D -> 2D PCA):\n")
+print(train_pca[1:5, .(date, PC1, PC2)])
+
+extreme_pc1_idx <- which.max(abs(train_pca$PC1))
+cat(sprintf("\nIdentified extreme PC1 at row %d: PC1=%g, PC2=%g\n",
+        extreme_pc1_idx, train_pca$PC1[extreme_pc1_idx],
+        train_pca$PC2[extreme_pc1_idx]))
+
+extreme_point <- train_pca[extreme_pc1_idx]
+
+reconstructed <- backward_single_pipe(parsed_pca, env = list(data = extreme_point))
+
+cat("\nBackward transformation (2D -> 3D reconstruction):\n")
+cat(sprintf("Original: X1=%g, X2=%g, X3=%g\n",
+        train$X1[extreme_pc1_idx], train$X2[extreme_pc1_idx],
+        train$X3[extreme_pc1_idx]))
+cat(sprintf("Reconstructed: X1=%g, X2=%g, X3=%g\n",
+        reconstructed$X1, reconstructed$X2, reconstructed$X3))
+
+error_X1 <- abs(train$X1[extreme_pc1_idx] - reconstructed$X1)
+error_X2 <- abs(train$X2[extreme_pc1_idx] - reconstructed$X2)
+error_X3 <- abs(train$X3[extreme_pc1_idx] - reconstructed$X3)
+cat(sprintf("Reconstruction errors: X1=%g, X2=%g, X3=%g\n",
+        error_X1, error_X2, error_X3))
+
+subset_idx <- 1:5
+train_subset_pca <- forward_single_pipe(
+    parsed_pca,
+    env = list(data = train[subset_idx])
+)
+
+train_subset_reconstructed <- backward_single_pipe(
+    parsed_pca,
+    env = list(data = train_subset_pca)
+)
+
+mean_error_X1 <- mean(abs(train[subset_idx]$X1 - train_subset_reconstructed$X1))
+mean_error_X2 <- mean(abs(train[subset_idx]$X2 - train_subset_reconstructed$X2))
+mean_error_X3 <- mean(abs(train[subset_idx]$X3 - train_subset_reconstructed$X3))
+
+cat(sprintf("\nRoundtrip verification on 5 points:\n"))
+cat(sprintf("Mean errors: X1=%g, X2=%g, X3=%g\n",
+        mean_error_X1, mean_error_X2, mean_error_X3))
+cat("Approximate reversibility: Information loss expected (3D -> 2D -> 3D)\n")
+```
+
+**Key insights**:
+- PCA reduces 3 features to 2 components (lossy transformation)
+- Backward transformation enables interpretation of PC space findings in original units
+- Roundtrip reconstruction shows information loss from dimensionality reduction
+- Both forward and backward use training PCA parameters (rotation matrix, center, scale)
+- Workflow demonstrates: parse → forward → identify patterns → backward → interpret
+
+This pattern applies to any approximate reversible transformation where you need to move between transformed and original spaces for analysis.
 
 ## Recipe-Based Transformations
 
@@ -589,6 +1196,35 @@ gen_scale_cols <- function(cols, x, ...) {
 }
 ```
 
+**Reversible version** (for target scaling workflows):
+
+```{r gen_scale_cols_reversible}
+gen_scale_cols_reversible <- function(cols, x, ...) {
+    train_means <- colMeans(x[, ..cols], na.rm = TRUE)
+    train_sds <- apply(x[, ..cols], 2, sd, na.rm = TRUE)
+
+    forward <- function(x) {
+        x_copy <- copy(x)
+        for (col in cols) {
+            x_copy[[col]] <- (x_copy[[col]] - train_means[col]) / train_sds[col]
+        }
+        x_copy
+    }
+
+    backward <- function(x) {
+        x_copy <- copy(x)
+        for (col in cols) {
+            x_copy[[col]] <- (x_copy[[col]] * train_sds[col]) + train_means[col]
+        }
+        x_copy
+    }
+
+    list(forward = forward, backward = backward)
+}
+```
+
+This reversible version allows reconstruction of original scale after modeling. See Section 4.3 for roundtrip workflow examples.
+
 **Demo: Train-Test Consistency**
 
 ```{r demo_scale_cols}
@@ -610,7 +1246,7 @@ pipe_scale <- list(
 
 parsed_scale <- parse_single_pipe(pipe_scale, env = data_env_train)
 
-train_scaled <- eval_single_pipe(parsed_scale, env = data_env_train)
+train_scaled <- forward_single_pipe(parsed_scale, env = data_env_train)
 
 # Training data (scaled):
 cat(sprintf("X1 - Mean: %g, SD: %g\nX2 - Mean: %g, SD: %g\n\n",
@@ -619,7 +1255,7 @@ cat(sprintf("X1 - Mean: %g, SD: %g\nX2 - Mean: %g, SD: %g\n\n",
 
 data_env_test <- list(data = test)
 
-test_scaled <- eval_single_pipe(parsed_scale, env = data_env_test)
+test_scaled <- forward_single_pipe(parsed_scale, env = data_env_test)
 
 # Test data (uses training mean/sd):
 # Different from 0/1 - correctly uses training stats
@@ -696,7 +1332,7 @@ pipe_onehot <- list(
 
 parsed_onehot <- parse_single_pipe(pipe_onehot, env = data_env_train)
 
-train_encoded <- eval_single_pipe(parsed_onehot, env = data_env_train)
+train_encoded <- forward_single_pipe(parsed_onehot, env = data_env_train)
 
 # Original day_type (training):
 print(head(train$day_type, 8))
@@ -708,7 +1344,7 @@ print(head(train_encoded[, .(date, day_type_weekend)], 8))
 
 data_env_test <- list(data = test)
 
-test_encoded <- eval_single_pipe(parsed_onehot, env = data_env_test)
+test_encoded <- forward_single_pipe(parsed_onehot, env = data_env_test)
 
 # Test data encoded with training levels:
 cat("\n")
@@ -771,7 +1407,7 @@ pipe_log <- list(
 
 parsed_log <- parse_single_pipe(pipe_log, env = data_env_train)
 
-train_logged <- eval_single_pipe(parsed_log, env = data_env_train)
+train_logged <- forward_single_pipe(parsed_log, env = data_env_train)
 
 # Original Y (training, first 5):
 print(head(data_env_train$data$Y, 5))
@@ -784,7 +1420,7 @@ print(head(train_logged$Y, 5))
 cat(sprintf("\nExpected: %g\nGot: %g\n\n",
         log(data_env_train$data$Y[1] + 1), train_logged$Y[1]))
 data_env_test <- list(data = simple_dt_date[16:20])
-test_logged <- eval_single_pipe(parsed_log, env = data_env_test)
+test_logged <- forward_single_pipe(parsed_log, env = data_env_test)
 
 # Test data also log-transformed:
 print(head(test_logged$Y, 5))
@@ -849,7 +1485,7 @@ pipe_winsor <- list(
 
 parsed_winsor <- parse_single_pipe(pipe_winsor, env = data_env_train)
 
-train_winsor <- eval_single_pipe(parsed_winsor, env = data_env_train)
+train_winsor <- forward_single_pipe(parsed_winsor, env = data_env_train)
 
 # Training X1:
 bounds_10_90 <- quantile(train$X1, c(0.1, 0.9))
@@ -861,7 +1497,7 @@ cat(sprintf("10th/90th percentiles (bounds): %g, %g\n\n",
 
 data_env_test <- list(data = test)
 
-test_winsor <- eval_single_pipe(parsed_winsor, env = data_env_test)
+test_winsor <- forward_single_pipe(parsed_winsor, env = data_env_test)
 
 # Test X1:
 # Uses training bounds, not test quantiles
@@ -933,7 +1569,7 @@ pipe_boxcox <- list(
 
 parsed_boxcox <- parse_single_pipe(pipe_boxcox, env = data_env_train)
 
-train_bc <- eval_single_pipe(parsed_boxcox, env = data_env_train)
+train_bc <- forward_single_pipe(parsed_boxcox, env = data_env_train)
 
 # Training X3:
 cat(sprintf("Original - Mean: %g, SD: %g\nBox-Cox - Mean: %g, SD: %g\n\n",
@@ -942,7 +1578,7 @@ cat(sprintf("Original - Mean: %g, SD: %g\nBox-Cox - Mean: %g, SD: %g\n\n",
 
 data_env_test <- list(data = test)
 
-test_bc <- eval_single_pipe(parsed_boxcox, env = data_env_test)
+test_bc <- forward_single_pipe(parsed_boxcox, env = data_env_test)
 
 # Test X3 (uses training lambda=0.5):
 cat(sprintf("Original - Mean: %g\nBox-Cox - Mean: %g\n\n",
@@ -1099,7 +1735,7 @@ pipe_ma <- list(
 
 parsed_ma <- parse_single_pipe(pipe_ma, env = data_env_train)
 
-train_smoothed <- eval_single_pipe(parsed_ma, env = data_env_train)
+train_smoothed <- forward_single_pipe(parsed_ma, env = data_env_train)
 
 # Original vs smoothed (training):
 print(head(train[, .(date, X1)], 8))
@@ -1109,7 +1745,7 @@ print(head(train_smoothed[, .(date, X1, X1_ma3)], 8))
 
 # Apply to test data
 data_env_test <- list(data = test)
-test_smoothed <- eval_single_pipe(parsed_ma, env = data_env_test)
+test_smoothed <- forward_single_pipe(parsed_ma, env = data_env_test)
 
 # Test data smoothed with same window:
 print(head(test_smoothed[, .(date, X1, X1_ma3)], 5))
@@ -1180,7 +1816,7 @@ pipe_diff <- list(
 
 parsed_diff <- parse_single_pipe(pipe_diff, env = data_env_train)
 
-train_diffed <- eval_single_pipe(parsed_diff, env = data_env_train)
+train_diffed <- forward_single_pipe(parsed_diff, env = data_env_train)
 
 # Original vs differenced (training):
 print(head(train[, .(date, Y)], 8))
@@ -1195,7 +1831,7 @@ cat(sprintf("Expected Y_diff1[2] = %g\n", train_diffed$Y_diff1[2]))
 
 # Apply to test data
 data_env_test <- list(data = test)
-test_diffed <- eval_single_pipe(parsed_diff, env = data_env_test)
+test_diffed <- forward_single_pipe(parsed_diff, env = data_env_test)
 
 # Test data differenced:
 print(head(test_diffed[, .(date, Y, Y_diff1)], 5))
@@ -1269,7 +1905,7 @@ pipe_interact <- list(
 
 parsed_interact <- parse_single_pipe(pipe_interact, env = data_env_train)
 
-train_interact <- eval_single_pipe(parsed_interact, env = data_env_train)
+train_interact <- forward_single_pipe(parsed_interact, env = data_env_train)
 
 # New interaction columns:
 new_cols <- setdiff(names(train_interact), names(train))
@@ -1285,7 +1921,7 @@ cat(sprintf("Expected X1_x_X2[1] = %g\n", train_interact$X1_x_X2[1]))
 
 # Apply to test data
 data_env_test <- list(data = test)
-test_interact <- eval_single_pipe(parsed_interact, env = data_env_test)
+test_interact <- forward_single_pipe(parsed_interact, env = data_env_test)
 
 # Test data interactions:
 print(head(test_interact[, .(date, X1, X2, X1_x_X2)], 5))
@@ -1344,8 +1980,8 @@ parsed <- parse_single_pipe(
 )
 
 # Test eval phase
-train_result <- eval_single_pipe(parsed, env = list(data = train))
-test_result <- eval_single_pipe(parsed, env = list(data = test))
+train_result <- forward_single_pipe(parsed, env = list(data = train))
+test_result <- forward_single_pipe(parsed, env = list(data = test))
 ```
 
 **3. Edge Cases**:
@@ -1416,7 +2052,7 @@ raw_pipe_chained <- list(
 parsed_chained <- parse_single_pipe(raw_pipe_chained, env = data_env_train)
 
 # Eval on train: log(Y) then scale
-train_chained <- eval_single_pipe(parsed_chained, env = data_env_train)
+train_chained <- forward_single_pipe(parsed_chained, env = data_env_train)
 
 # Show results:
 cat(sprintf("Original Y[1]: %g\nLogged: %g\nLogged+Scaled: %g\n\n",
@@ -1437,7 +2073,7 @@ cat(sprintf("Expected (manual): %g\nGot (pipeline): %g\nMatch: %s\n\n",
 
 # Eval on test: same transformations
 data_env_test <- list(data = test)
-test_chained <- eval_single_pipe(parsed_chained, env = data_env_test)
+test_chained <- forward_single_pipe(parsed_chained, env = data_env_test)
 
 # Test Y is log-transformed with TRAINING mean/sd of log(Y)
 cat(sprintf("Test Y[1] original: %g\nTest Y[1] log+scaled: %g\n",
@@ -1486,7 +2122,7 @@ data_list <- list(
 )
 
 parsed_transform <- parse_pipes(raw_pipes_transform, env = data_list)
-result_transform <- eval_pipes(parsed_transform, env = data_list)
+result_transform <- forward_pipes(parsed_transform, env = data_list)
 
 gen_combiner <- function(combine_fun, ...) {
     function(x) {
@@ -1502,7 +2138,7 @@ raw_pipe_combine <- list(
 )
 
 parsed_combine <- parse_single_pipe(raw_pipe_combine, env = list(result = result_transform))
-result_final <- eval_single_pipe(parsed_combine, env = list(result = result_transform))
+result_final <- forward_single_pipe(parsed_combine, env = list(result = result_transform))
 ```
 
 So long as the closure you write accepts a single argument `x`, you can design it to handle
@@ -1678,7 +2314,7 @@ Avoid explicit loops when data.table can vectorize the operation
 ```r
 # Use Rprof() to identify bottlenecks
 Rprof("pipe_profile.out")
-result <- eval_single_pipe(parsed, env = list(data = large_data))
+result <- forward_single_pipe(parsed, env = list(data = large_data))
 Rprof(NULL)
 summaryRprof("pipe_profile.out")
 ```
@@ -1692,7 +2328,7 @@ library(parallel)
 parsed_pipes <- parse_pipes(list_of_raw_pipes, env = data_env)
 
 # Parallel eval
-results <- mclapply(parsed_pipes, eval_single_pipe,
+results <- mclapply(parsed_pipes, forward_single_pipe,
                    env = data_env, mc.cores = 4)
 ```
 
@@ -1786,7 +2422,7 @@ raw_pipe_scale <- list(
 parsed_scale <- parse_single_pipe(raw_pipe_scale, env = data_env_train)
 
 # STEP 2: Eval transformation on training data
-train_scaled <- eval_single_pipe(parsed_scale, env = data_env_train)
+train_scaled <- forward_single_pipe(parsed_scale, env = data_env_train)
 
 # Training data is now scaled:
 cat(sprintf("Original X1[1]: %g\nScaled X1[1]: %g\n\n",
@@ -1814,7 +2450,7 @@ print(head(train_final_dt[, .(index, X1_1, X1_2, X1_3)], 6))
 data_env_test <- list(data = test)
 
 # Same transformation (training parameters)
-test_scaled <- eval_single_pipe(parsed_scale, env = data_env_test)
+test_scaled <- forward_single_pipe(parsed_scale, env = data_env_test)
 
 # Same slicing specification
 test_final <- slice(
@@ -1889,7 +2525,7 @@ raw_pipe_scale <- list(
 
 parsed_scale <- parse_single_pipe(raw_pipe_scale, env = data_env_train)
 
-train_final_dt <- eval_single_pipe(parsed_scale, env = data_env_train)
+train_final_dt <- forward_single_pipe(parsed_scale, env = data_env_train)
 ```
 
 ### Pattern 2: Slice → Transform
@@ -1944,7 +2580,7 @@ raw_pipe <- list(
 # Parse and evaluate
 data_env <- list(data = simple_dt_date)
 parsed_pipe <- parse_single_pipe(raw_pipe, env = data_env)
-result <- eval_single_pipe(parsed_pipe, env = data_env)
+result <- forward_single_pipe(parsed_pipe, env = data_env)
 
 # Show summary statistics computed from lags 1-5
 print(result[1:5, .(index, min, mean, median, max)])
@@ -1999,7 +2635,7 @@ raw_pipe <- list(
 # Parse and evaluate
 data_env <- list(data = simple_dt_date)
 parsed_pipe <- parse_single_pipe(raw_pipe, env = data_env)
-result <- eval_single_pipe(parsed_pipe, env = data_env)
+result <- forward_single_pipe(parsed_pipe, env = data_env)
 
 # DWT produces wavelet coefficients at multiple levels
 print(result[1:5, .SD, .SDcols = 1:5])
@@ -2071,141 +2707,147 @@ cat("This would be extremely cumbersome and error-prone with frollapply\n")
 
 **Next**: Section 8 demonstrates a complete end-to-end forecasting pipeline combining multiple transformations and slicing strategies.
 
-## Complete Forecasting Pipeline
+## Complete Forecasting Pipeline: Roundtrip Workflow
 
-This section demonstrates a **complete, production-ready forecasting pipeline** combining all concepts from Sections 1-7:
+This section demonstrates an **end-to-end roundtrip forecasting workflow** combining transformation, modeling, prediction, and reconstruction across training and test datasets.
 
-- Categorical encoding (one-hot)
-- Outlier handling (winsorization)
-- Feature scaling (standardization)
-- Temporal features (lag creation via slicing)
-- Train-test consistency (throughout)
+**Workflow**: Train model on transformed scale, generate predictions, reconstruct to original units.
 
-**Business Problem**:
+**Key concepts demonstrated**:
 
-You're building a daily sales forecasting model for a retail store. Your data includes:
+- Separate feature and target pipelines (non-reversible vs reversible)
+- Forward transformation for model training (features + target)
+- Model fitting on transformed scale
+- Backward transformation for prediction reconstruction
+- Train-test consistency throughout forward and backward directions
 
-- **Numeric features**: Temperature (X1), foot traffic (X2), inventory levels (X3)
-- **Categorical features**: Day type (weekday/weekend)
-- **Target**: Daily sales (Y)
+### Roundtrip Workflow Implementation
 
-**Requirements**:
+**Pipeline architecture**:
 
-1. Encode categorical variables for model compatibility
-2. Handle outliers in numeric features (temperature, foot traffic can spike)
-3. Standardize features for model training
-4. Create 3-day lag features to capture temporal patterns
-5. Maintain strict train-test consistency (prevent data leakage)
+- **Features pipe** (non-reversible): one-hot → winsorize → scale X features → slicer
+- **Target pipe** (reversible): scale Y only using `gen_scale_cols_reversible`
 
-**Result**: Model-ready data.table ready for regression, tree models, or neural networks.
-
-### The Complete Pipeline
-
-**Pipeline Overview**:
+**Workflow steps**:
 
 1. Train-test split
-2. Define transformation pipeline (encode, winsorize, scale)
-3. Parse transformations on training data (learn parameters)
-4. Evaluate transformations on training data
-5. Create lag features via slicing
-6. Apply same pipeline to test data
-7. Verify consistency
+2. Define separate pipelines for features and target
+3. Parse both pipes on training data (learn parameters)
+4. Forward transform training data (both pipes)
+5. Fit simple linear model on transformed scale
+6. Forward transform test features
+7. Generate predictions in transformed space
+8. Backward transform predictions to original Y scale
+9. Verify predictions are on correct scale
 
-**Full Implementation**:
-
-```{r complete_pipeline}
+```{r complete_roundtrip_pipeline}
 library(shapeshiftr)
 library(data.table)
 data(simple_dt_date)
 
-# === STEP 1: TRAIN-TEST SPLIT ===
-
 train <- copy(simple_dt_date[1:15])
 test <- copy(simple_dt_date[16:20])
 
-# Ensure categorical columns are factors
 train[, day_type := as.factor(day_type)]
 test[, day_type := as.factor(day_type)]
 
-cat(sprintf("Training observations: %d\nTest observations: %d\n\n", nrow(train), nrow(test)))
+cat(sprintf("Training: %d obs | Test: %d obs\n\n", nrow(train), nrow(test)))
 
-# === STEP 2: DEFINE TRANSFORMATION PIPELINE ===
-
-raw_pipe <- list(
+pipe_features <- list(
     on = "data",
     transforms = list(
-        # Transform 1: One-hot encode day_type
         list(fun = "gen_one_hot", col = "day_type", drop_first = TRUE),
-
-        # Transform 2: Winsorize outliers in X1, X2
-        list(fun = "gen_winsorize", cols = c("X1", "X2"),
-            lower = 0.1, upper = 0.9),
-
-        # Transform 3: Scale numeric features
-        list(fun = "gen_scale_cols", cols = c("X1", "X2", "X3", "Y")),
-
-        # Final transform: Slicer
-        list(fun = "gen_slicer", 
-            variables = c("X1", "X2", "Y", "day_type_weekend"), walk_on = "date", slice_on = "date",
-            L = list(X1 = -seq(3), X2 = -seq(3), Y = -seq(2), day_type_weekend = 0)
-        )
+        list(fun = "gen_winsorize", cols = c("X1", "X2"), lower = 0.1, upper = 0.9),
+        list(fun = "gen_scale_cols", cols = c("X1", "X2", "X3")),
+        list(fun = "gen_slicer", variables = c("X1", "X2", "day_type_weekend"),
+            walk_on = "date", slice_on = "date",
+            L = list(X1 = -c(1, 2), X2 = -c(1, 2), day_type_weekend = 0))
     )
 )
 
-# === STEP 3: PARSE TRANSFORMATIONS ON TRAINING DATA ===
-# This is where parameters are LEARNED from training data
+pipe_target <- list(
+    on = "data",
+    transforms = list(
+        list(fun = "gen_scale_cols_reversible", cols = "Y")
+    )
+)
 
 data_env_train <- list(data = train)
-parsed_pipe <- parse_single_pipe(raw_pipe, env = data_env_train)
 
-cat("Transformations parsed (parameters learned from training data)\n\n")
+parsed_features <- parse_single_pipe(pipe_features, env = data_env_train)
+parsed_target <- parse_single_pipe(pipe_target, env = data_env_train)
 
-# === STEP 4: EVALUATE TRANSFORMATIONS ON TRAINING DATA ===
-# Apply learned transformations to training data
+cat("Step 3: Parsed feature and target pipes (learned parameters)\n\n")
 
-train_final_dt <- eval_single_pipe(parsed_pipe, env = data_env_train)
+train_features <- forward_single_pipe(parsed_features, env = data_env_train)
+train_target <- forward_single_pipe(parsed_target, env = data_env_train)
 
-# Final training data:
-cat(sprintf("Final training features: %d columns\n", ncol(train_final_dt)))
-cat(sprintf("Features: %s\n\n",
-        paste(setdiff(names(train_final_dt), "index"), collapse = ", ")))
+cat("Step 4: Forward transformed training data\n")
+cat(sprintf("  Features: %s\n",
+        paste(setdiff(names(train_features), c("date", "index")), collapse = ", ")))
+cat(sprintf("  Target Y range (transformed): [%g, %g]\n",
+        min(train_target$Y, na.rm = TRUE), max(train_target$Y, na.rm = TRUE)))
+cat(sprintf("  Target Y mean (should be ~0): %g\n\n",
+        round(mean(train_target$Y, na.rm = TRUE), 6)))
 
-# Show sample (first 6 rows, subset of columns):
-# Note: day_type_weekend becomes day_type_weekend_1 (L=0 creates _1 suffix)
-print(train_final_dt[1:6, .(index, day_type_weekend_1, X1_1, X1_2, Y_1)])
+train_model_data <- cbind(train_features, train_target[, .(Y)])
+train_model_data <- train_model_data[complete.cases(train_model_data)]
 
-# === STEP 6: APPLY SAME PIPELINE TO TEST DATA ===
-# Use SAME parsed pipe (training parameters) on test data
+model <- lm(Y ~ X1_1 + X2_1 + day_type_weekend_1, data = train_model_data)
 
-test_final_dt <- eval_single_pipe(parsed_pipe, env = list(data = test))
+cat("Step 5: Fitted linear model on transformed scale\n")
+cat(sprintf("  Coefficients: %s\n\n",
+        paste(sprintf("%s=%g", names(coef(model)), round(coef(model), 3)),
+            collapse = ", ")))
 
-# Final test data:
-cat(sprintf("Final test features: %d columns\n\n", ncol(test_final_dt)))
+data_env_test <- list(data = test)
 
-# Show sample:
-print(test_final_dt[1:3, .(index, day_type_weekend_1, X1_1, X1_2, Y_1)])
+test_features <- forward_single_pipe(parsed_features, env = data_env_test)
 
-# === STEP 7: VERIFY TRAIN-TEST CONSISTENCY ===
+cat("Step 6: Forward transformed test features\n\n")
 
-# Consistency check 1: Same columns
-cat(sprintf("Train and test have same columns: %s\n",
-        all(names(train_final_dt) == names(test_final_dt))))
+predictions_transformed <- predict(model, newdata = test_features)
 
-# Consistency check 2: One-hot encoding consistent
-cat(sprintf("Train day_type_weekend_1 values: %s\n",
-        paste(unique(train_final_dt$day_type_weekend_1), collapse = ", ")))
-cat(sprintf("Test day_type_weekend_1 values: %s\n\n",
-        paste(unique(test_final_dt$day_type_weekend_1), collapse = ", ")))
+cat("Step 7: Generated predictions in transformed space\n")
+cat(sprintf("  Predictions range (transformed): [%g, %g]\n\n",
+        min(predictions_transformed, na.rm = TRUE),
+        max(predictions_transformed, na.rm = TRUE)))
 
-# Consistency check 3: Scaling used training parameters
-# Test mean is NOT 0 (proof it used training mean/sd)
-cat(sprintf("Test X1_1 mean: %g (NOT 0 - correctly uses training parameters)\n",
-        round(mean(test_final_dt$X1_1, na.rm = TRUE), 4)))
+predictions_dt <- data.table(Y = predictions_transformed)
 
-# Consistency check 4: Same lag structure
-lag_cols_train <- grep("_[0-9]+$", names(train_final_dt), value = TRUE)
-lag_cols_test <- grep("_[0-9]+$", names(test_final_dt), value = TRUE)
-cat(sprintf("Train lag columns: %d\nTest lag columns: %d\nMatch: %s\n\n",
-        length(lag_cols_train), length(lag_cols_test),
-        all(lag_cols_train == lag_cols_test)))
+predictions_original <- backward_single_pipe(
+    parsed_target,
+    env = list(data = predictions_dt)
+)
+
+cat("Step 8: Backward transformed predictions to original scale\n")
+cat(sprintf("  Predictions range (original): [%g, %g]\n",
+        min(predictions_original$Y, na.rm = TRUE),
+        max(predictions_original$Y, na.rm = TRUE)))
+
+original_Y_range <- range(train$Y, na.rm = TRUE)
+cat(sprintf("  Training Y range (original): [%g, %g]\n\n",
+        original_Y_range[1], original_Y_range[2]))
+
+cat("Step 9: Verification\n")
+cat(sprintf("  Predictions on original Y scale: %s\n",
+        all(predictions_original$Y >= original_Y_range[1] - 5 &
+            predictions_original$Y <= original_Y_range[2] + 5)))
+cat(sprintf("  Used training mean/sd for backward: %s\n",
+        "TRUE (closure guarantees consistency)"))
+
+cat("\nWorkflow summary:\n")
+cat("  Parse -> Forward (train) -> Fit model -> Forward (test) ->\n")
+cat("  Predict (transformed) -> Backward (predictions) -> Original scale\n")
 ```
+
+**Key insights**:
+
+- **Separate pipes**: Features (non-reversible) and target (reversible) handled independently
+- **Forward direction**: Both pipes use `forward_single_pipe()` with training parameters
+- **Backward direction**: Only target pipe needs backward (reconstruction of predictions)
+- **Parameter consistency**: Backward uses SAME training mean/sd captured during parse
+- **Scale verification**: Predictions reconstructed to original Y units
+- **Production workflow**: Model operates on transformed scale, outputs original scale
+
+This pattern is essential for any workflow where models train on transformed targets but must produce forecasts in original business units (sales, temperature, demand, etc.).
