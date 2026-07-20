@@ -1,4 +1,4 @@
-# slice-ts
+# shapeshiftr 0.5
 
 ## New features
 
