@@ -156,8 +156,12 @@
 #' 
 #' @export
 
-slice <- function(data, variables, walk_on, slice_on = walk_on,
-    L = -1, start = 1, step = 1, names = auto_name(variables)) {
+slice <- function(data, ...) UseMethod("slice")
+
+#' @export
+
+slice.default <- function(data, variables, walk_on, slice_on = walk_on,
+    L = -1, start = 1, step = 1, names = auto_name(variables), ...) {
 
     params <- parse_slice_args(data, variables, walk_on, slice_on, L, start, step, names)
     out <- do_slices(data, params)
@@ -165,13 +169,31 @@ slice <- function(data, variables, walk_on, slice_on = walk_on,
     return(out)
 }
 
+#' @export
+
+slice.ts <- function(data, L = -1, start = 1, step = 1, ...) {
+    out <- slice.default(ts2dt(data), "value", "time", L = L, start = start, step = step)
+    out
+}
+
+#' @export
+
+slice.mts <- function(data, variables, L = -1, start = 1, step = 1, names = auto_name(variables), ...) {
+    slice.default(ts2dt(data), variables, "time", L = L, start = start, step = step, names = names)
+}
+
 # SLICING INTERNALS --------------------------------------------------------------------------------
 
 do_slices <- function(data, params) {
-    slices <- run_loop(
-        params$slice_times,
-        function(i) do_single_slice(data, i, params)
-    )
+
+    # truque bem gambiarrado
+    # lapply subsets por uma primitiva em C que quebra a classe e atributos especiais de um vetor,
+    # como a classe int_time
+    # as.list() faria a mesma coisa, entao e necessario dar essa volta para que os slice_times
+    # virem uma lista de int_times que efetivamente preservam sua classe e atributos
+    st <- params$slice_times
+    st <- lapply(seq_along(st), function(i) st[i])
+    slices <- run_loop(st, function(i) do_single_slice(data, i, params))
     slices <- Reduce(c, slices)
 
     return(slices)
@@ -206,4 +228,14 @@ auto_name <- function(x) {
     x <- unname(unlist(x))
     x <- x[order(unlist(ord))]
     return(x)
+}
+
+ts2dt <- function(x) UseMethod("ts2dt")
+
+ts2dt.ts <- function(x) {
+    data.table(time = int_time(x), value = as.numeric(x))
+}
+
+ts2dt.mts <- function(x) {
+    cbind(data.table(time = int_time(x)), as.matrix(x))
 }

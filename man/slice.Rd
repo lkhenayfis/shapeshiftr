@@ -4,16 +4,7 @@
 \alias{slice}
 \title{Generate Temporal Slices From Data}
 \usage{
-slice(
-  data,
-  variables,
-  walk_on,
-  slice_on = walk_on,
-  L = -1,
-  start = 1,
-  step = 1,
-  names = auto_name(variables)
-)
+slice(data, ...)
 }
 \arguments{
 \item{data}{the data.frame-like object on which to operate}
