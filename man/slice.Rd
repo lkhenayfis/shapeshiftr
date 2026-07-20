@@ -2,12 +2,41 @@
 % Please edit documentation in R/slice.r
 \name{slice}
 \alias{slice}
+\alias{slice.default}
+\alias{slice.ts}
+\alias{slice.mts}
 \title{Generate Temporal Slices From Data}
 \usage{
 slice(data, ...)
+
+\method{slice}{default}(
+  data,
+  variables,
+  walk_on,
+  slice_on = walk_on,
+  L = -1,
+  start = 1,
+  step = 1,
+  names = auto_name(variables),
+  ...
+)
+
+\method{slice}{ts}(data, L = -1, start = 1, step = 1, ...)
+
+\method{slice}{mts}(
+  data,
+  variables,
+  L = -1,
+  start = 1,
+  step = 1,
+  names = auto_name(variables),
+  ...
+)
 }
 \arguments{
 \item{data}{the data.frame-like object on which to operate}
+
+\item{...}{sem funcao, apenas para consistencia entre metodos}
 
 \item{variables}{names of variables for extraction in slicing}
 

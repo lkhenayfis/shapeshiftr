@@ -75,6 +75,7 @@
 #'     of the form "2 hours". See \code{\link{difftime}} for which time units are available
 #' @param names naming for each sliced variable; by default this is the same as \code{variables} or,
 #'     if there are duplicates, appends \code{_X} where X is an increasing integer
+#' @param ... sem funcao, apenas para consistencia entre metodos
 #' 
 #' @seealso 
 #' * \code{\link{new_slice_artifact}} for details on the returned slice_artifact object structure
@@ -158,6 +159,8 @@
 
 slice <- function(data, ...) UseMethod("slice")
 
+#' @rdname slice
+#'
 #' @export
 
 slice.default <- function(data, variables, walk_on, slice_on = walk_on,
@@ -169,6 +172,8 @@ slice.default <- function(data, variables, walk_on, slice_on = walk_on,
     return(out)
 }
 
+#' @rdname slice
+#'
 #' @export
 
 slice.ts <- function(data, L = -1, start = 1, step = 1, ...) {
@@ -176,6 +181,8 @@ slice.ts <- function(data, L = -1, start = 1, step = 1, ...) {
     out
 }
 
+#' @rdname slice
+#'
 #' @export
 
 slice.mts <- function(data, variables, L = -1, start = 1, step = 1, names = auto_name(variables), ...) {

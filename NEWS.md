@@ -1,3 +1,9 @@
+# slice-ts
+
+## New features
+
+* Add suporte a slice de objetos serie temporal
+
 # shapeshiftr 0.4
 
 ## New features

@@ -5,20 +5,24 @@ int_time <- function(x, ...) UseMethod("int_time")
 int_time.ts <- function(x, ...) {
     times <- as.numeric(time(x))
     freq <- frequency(x)
-    start <- start(x)
 
     int_time(times, freq)
 }
 
-int_time.numeric <- function(x, frequency) {
-    if (frequency == 1) return(new_int_time(x, frequency, 0, x))
+int_time.numeric <- function(x, frequency, ...) {
+    if (frequency == 1) return(new_int_time(round(x), frequency, 0, x))
 
-    seasons <- (x %% 1) * frequency + 1
+    # encode from the absolute season count round(x * frequency), an exact integer that is a pure
+    # function of (x, frequency). This makes the same calendar instant encode identically regardless
+    # of the arithmetic route that produced x (lag subtraction, seq accumulation, time()), avoiding
+    # the floor()/season float-flip at period boundaries that broke match()
     extra <- ceiling(log10(frequency))
 
-    part1 <- floor(x) * 10^extra
+    abs_season <- round(x * frequency)
+    year   <- abs_season %/% frequency
+    season <- abs_season %% frequency + 1
 
-    new_int_time(part1 + seasons, frequency, extra, x)
+    new_int_time(year * 10^extra + season, frequency, extra, x)
 }
 
 new_int_time <- function(x, frequency, extra, inner_times) {
@@ -34,7 +38,7 @@ new_int_time <- function(x, frequency, extra, inner_times) {
 `[.int_time` <- function(x, i, ...) {
     out1 <- unclass(x)[i]
     out2 <- attr(x, "inner_times")[i]
-    new_int_time(out1, attr(x, "freq"), attr(x, "extra"), out2)
+    new_int_time(out1, attr(x, "frequency"), attr(x, "extra"), out2)
 }
 
 #' @export
@@ -46,6 +50,15 @@ new_int_time <- function(x, frequency, extra, inner_times) {
 `+.int_time` <- function(e1, e2) {
     aux <- attr(e1, "inner_times") + e2 / attr(e1, "frequency")
     int_time(aux, frequency = attr(e1, "frequency"))
+}
+
+#' @export
+
+c.int_time <- function(...) {
+    args  <- list(...)
+    vals  <- unlist(lapply(args, unclass), use.names = FALSE)
+    inner <- unlist(lapply(args, attr, "inner_times"), use.names = FALSE)
+    new_int_time(vals, attr(args[[1]], "frequency"), attr(args[[1]], "extra"), inner)
 }
 
 #' @export
