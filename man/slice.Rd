@@ -7,42 +7,26 @@
 \alias{slice.mts}
 \title{Generate Temporal Slices From Data}
 \usage{
-slice(data, ...)
+slice(data, L = -1, start = 1, step = 1, ...)
 
 \method{slice}{default}(
   data,
-  variables,
-  walk_on,
-  slice_on = walk_on,
   L = -1,
   start = 1,
   step = 1,
-  names = auto_name(variables),
+  variables = NULL,
+  walk_on = NULL,
+  slice_on = walk_on,
+  names = NULL,
   ...
 )
 
 \method{slice}{ts}(data, L = -1, start = 1, step = 1, ...)
 
-\method{slice}{mts}(
-  data,
-  variables,
-  L = -1,
-  start = 1,
-  step = 1,
-  names = auto_name(variables),
-  ...
-)
+\method{slice}{mts}(data, L = -1, start = 1, step = 1, variables = NULL, ...)
 }
 \arguments{
 \item{data}{the data.frame-like object on which to operate}
-
-\item{...}{sem funcao, apenas para consistencia entre metodos}
-
-\item{variables}{names of variables for extraction in slicing}
-
-\item{walk_on}{name of the column to use as index for centering each slice. See Details}
-
-\item{slice_on}{name of the column to use as reference for lead/lag slice search. See Details}
 
 \item{L}{lag/lead times of the variables that must be extracted. See Details}
 
@@ -52,6 +36,14 @@ a line number, or a date-like object, in which case it is interpreted literally}
 \item{step}{step size to walk through \code{walk_on}. Can be an integer, in which case it is
 interpreted as number of intervals in the temporal resolution of \code{walk_on}, or a string
 of the form "2 hours". See \code{\link{difftime}} for which time units are available}
+
+\item{...}{sem funcao, apenas para consistencia entre metodos}
+
+\item{variables}{names of variables for extraction in slicing}
+
+\item{walk_on}{name of the column to use as index for centering each slice. See Details}
+
+\item{slice_on}{name of the column to use as reference for lead/lag slice search. See Details}
 
 \item{names}{naming for each sliced variable; by default this is the same as \code{variables} or,
 if there are duplicates, appends \code{_X} where X is an increasing integer}

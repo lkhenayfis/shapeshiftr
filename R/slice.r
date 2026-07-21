@@ -157,14 +157,14 @@
 #' 
 #' @export
 
-slice <- function(data, ...) UseMethod("slice")
+slice <- function(data, L = -1, start = 1, step = 1, ...) UseMethod("slice")
 
 #' @rdname slice
 #'
 #' @export
 
-slice.default <- function(data, variables, walk_on, slice_on = walk_on,
-    L = -1, start = 1, step = 1, names = auto_name(variables), ...) {
+slice.default <- function(data, L = -1, start = 1, step = 1, variables = NULL,
+    walk_on = NULL, slice_on = walk_on, names = NULL, ...) {
 
     params <- parse_slice_args(data, variables, walk_on, slice_on, L, start, step, names)
     out <- do_slices(data, params)
@@ -177,15 +177,14 @@ slice.default <- function(data, variables, walk_on, slice_on = walk_on,
 #' @export
 
 slice.ts <- function(data, L = -1, start = 1, step = 1, ...) {
-    out <- slice.default(ts2dt(data), "value", "time", L = L, start = start, step = step)
-    out
+    slice.default(ts2dt(data), "value", "time", L = L, start = start, step = step)
 }
 
 #' @rdname slice
 #'
 #' @export
 
-slice.mts <- function(data, variables, L = -1, start = 1, step = 1, names = auto_name(variables), ...) {
+slice.mts <- function(data, L = -1, start = 1, step = 1, variables = NULL, ...) {
     slice.default(ts2dt(data), variables, "time", L = L, start = start, step = step, names = names)
 }
 
@@ -227,15 +226,6 @@ do_single_slice.keyed_slice_params <- function(data, index, params) {
 }
 
 # HELPERS ------------------------------------------------------------------------------------------
-
-auto_name <- function(x) {
-    ord <- split(seq_along(x), x)
-    x <- split(x, x)
-    x <- lapply(x, function(xi) if (length(xi) > 1) paste0(xi, "_", seq_len(length(xi))) else xi)
-    x <- unname(unlist(x))
-    x <- x[order(unlist(ord))]
-    return(x)
-}
 
 ts2dt <- function(x) UseMethod("ts2dt")
 

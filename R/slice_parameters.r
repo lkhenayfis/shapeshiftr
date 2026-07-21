@@ -3,9 +3,10 @@
 
 parse_slice_args <- function(data, variables, walk_on, slice_on, L, start, step, names) {
 
-    check_index_column(data, walk_on)
-    check_index_column(data, walk_on)
+    walk_on <- check_index_column(data, walk_on)
+    slice_on <- check_index_column(data, slice_on)
     variables <- parse_variables(data, walk_on, NULL, variables)
+    names <- auto_name(variables)
     L <- parse_laglead_times(data, slice_on, L, variables)
     slice_times <- parse_slice_times(data, walk_on, start, step)
 
@@ -32,21 +33,37 @@ new_slice_parameters <- function(variables, walk_on, slice_on, L, slice_times, n
 
 # PARSE UTILS --------------------------------------------------------------------------------------
 
-check_index_column <- function(data, walk_on) {
-    if (!(walk_on %in% colnames(data))) stop("Column 'walk_on' not found in 'data'")
+check_index_column <- function(data, col) {
+    if (is.null(col)) col <- guess_index_col(data)
+    if (!(col %in% colnames(data))) stop(sprintf("Column '%s' not found in 'data'", col))
+    return(col)
+}
+
+guess_index_col <- function(data) {
+    candidates <- lapply(data, inherits, what = c("Date", "POSIXct", "POSIXlt"))
+    candidates <- sapply(candidates, any)
+    guess <- head(which(candidates), 1)
+    if (length(guess) == 0) stop("Couldn't guess 'walk_on' column -- provide this argument")
+    guess <- names(data)[guess]
+    return(guess)
 }
 
 parse_variables <- function(data, walk_on, key_by, variables) {
-    if (!missing("variables")) {
-        if (!(all(variables %in% colnames(data)))) {
-            stop("Some columns in 'variables' not found in 'data'")
-        }
-    } else {
-        variables <- colnames(data)
-        variables <- variables[!(variables %in% c(walk_on, key_by))]
+    if (is.null(variables)) {
+        variables <- setdiff(names(data), walk_on)
+    } else if (!(all(variables %in% colnames(data)))) {
+        stop("Some columns in 'variables' not found in 'data'")
     }
-
     return(variables)
+}
+
+auto_name <- function(x) {
+    ord <- split(seq_along(x), x)
+    x <- split(x, x)
+    x <- lapply(x, function(xi) if (length(xi) > 1) paste0(xi, "_", seq_len(length(xi))) else xi)
+    x <- unname(unlist(x))
+    x <- x[order(unlist(ord))]
+    return(x)
 }
 
 guess_sample_freq <- function(data, column) {
