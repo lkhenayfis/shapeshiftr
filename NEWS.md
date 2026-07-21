@@ -1,3 +1,16 @@
+# shapeshiftr 0.5.1
+
+## Bug fixes
+
+* Fixes error in `seq.int_time` where `length.to` path was never accessible
+* Fixes bug in subsetting of `slice_artifact`s from `ts` objects; `int_time` was being treated as
+  simple integer and messing up the indexes for subsetting
+
+## Misc
+
+* Major enhancement of testing of `slice_artifact`s from `ts` objects
+* Adds dedicated `int_time` testing
+
 # shapeshiftr 0.5
 
 ## New features
