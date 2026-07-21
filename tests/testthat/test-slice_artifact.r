@@ -17,15 +17,16 @@ generate_simple_slice <- function(type = c("date", "datetime", "ts")) {
 }
 
 generate_simple_slice_date <- function(...) {
-    slice(simple_dt_date, c("X1", "Y"), "date", L = list(X1 = -4:0, Y = 1:3))
+    slice(simple_dt_date, variables = c("X1", "Y"), walk_on = "date", L = list(X1 = -4:0, Y = 1:3))
 }
 
 generate_simple_slice_datetime <- function(...) {
-    slice(simple_dt_datetime, c("X1", "Y"), "datetime", L = list(X1 = -4:0, Y = 1:3))
+    slice(simple_dt_datetime, variables = c("X1", "Y"), walk_on = "datetime",
+        L = list(X1 = -4:0, Y = 1:3))
 }
 
 generate_simple_slice_ts <- function(...) {
-    slice(build_simple_mts(c("X1", "Y")), c("X1", "Y"), L = list(X1 = -4:0, Y = 1:3))
+    slice(build_simple_mts(c("X1", "Y")), variables = c("X1", "Y"), L = list(X1 = -4:0, Y = 1:3))
 }
 
 # there is no time-series equivalent of keyed slicing -- a ts/mts carries a single temporal index,
@@ -34,10 +35,10 @@ generate_simple_slice_ts <- function(...) {
 generate_keyed_slice <- function(type = c("date", "datetime")) {
     type <- match.arg(type)
     if (type == "date") {
-        out <- slice(keyed_dt_date, "date", "target_date",
+        out <- slice(keyed_dt_date, walk_on = "date", slice_on = "target_date",
             variables = c("X1"), L = list(X1 = 1:3), names = "X1_prev")
     } else {
-        out <- slice(keyed_dt_datetime, "datetime", "target_datetime",
+        out <- slice(keyed_dt_datetime, walk_on = "datetime", slice_on = "target_datetime",
             variables = c("X1"), L = list(X1 = 1:3), names = "X1_prev")
     }
 
@@ -267,7 +268,7 @@ test_that("combine_features", {
 
         # return.all = TRUE
 
-        simple_date_2 <- slice(simple_dt_date, c("X1", "Y", "X2"), "date",
+        simple_date_2 <- slice(simple_dt_date, variables = c("X1", "Y", "X2"), walk_on = "date",
             L = list(X1 = -4:0, X2 = -1:1, Y = 1:3))
 
         outer_comb <- mapply(c, simple_date_2$X1, simple_date_2$Y, SIMPLIFY = FALSE)
@@ -295,7 +296,7 @@ test_that("combine_features", {
 
         # return.all = TRUE
 
-        simple_ts_2 <- slice(build_simple_mts(c("X1", "Y", "X2")), c("X1", "Y", "X2"),
+        simple_ts_2 <- slice(build_simple_mts(c("X1", "Y", "X2")), variables = c("X1", "Y", "X2"),
             L = list(X1 = -4:0, X2 = -1:1, Y = 1:3))
 
         outer_comb <- mapply(c, simple_ts_2$X1, simple_ts_2$Y, SIMPLIFY = FALSE)

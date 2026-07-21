@@ -184,7 +184,7 @@ slice.ts <- function(data, L = -1, start = 1, step = 1, ...) {
 #'
 #' @export
 
-slice.mts <- function(data, L = -1, start = 1, step = 1, variables = NULL, ...) {
+slice.mts <- function(data, L = -1, start = 1, step = 1, variables = NULL, names = NULL, ...) {
     slice.default(ts2dt(data), variables, "time", L = L, start = start, step = step, names = names)
 }
 

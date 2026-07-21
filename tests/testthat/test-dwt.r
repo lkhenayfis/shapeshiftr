@@ -1,7 +1,7 @@
 
 test_that("dwt.slice_artifact", {
 
-    slices <- slice(simple_dt_date, "X1", "date", L = -3:0)
+    slices <- slice(simple_dt_date, variables = "X1", walk_on = "date", L = -3:0)
     slices <- na.exclude(slices)
 
     slices_dwt <- dwt(slices, "X1", filter = "haar")

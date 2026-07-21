@@ -9,10 +9,10 @@ test_that("new_slice_parameters", {
     expect_true(inherits(params, "keyed_slice_params"))
 })
 
-test_that("check_index_column", {
+test_that("parse_index_column", {
 
     test_fun <- function(data, walk_on) {
-        check_index_column(data, walk_on)
+        parse_index_column(data, walk_on)
         return(TRUE)
     }
 
@@ -26,16 +26,51 @@ test_that("check_index_column", {
 
 test_that("parse_variables", {
 
-    vars <- parse_variables(simple_dt_date, "date", NULL)
+    vars <- parse_variables(simple_dt_date, c("date", NULL), NULL)
     expect_equal(vars, colnames(simple_dt_date)[-1])
 
-    vars <- parse_variables(keyed_dt_date, "date", "target_date")
+    vars <- parse_variables(keyed_dt_date, c("date", "target_date"), NULL)
     expect_equal(vars, colnames(keyed_dt_date)[-(1:2)])
 
-    vars <- parse_variables(simple_dt_date, "date", NULL, c("X1", "X2"))
+    vars <- parse_variables(simple_dt_date, c("date", NULL), c("X1", "X2"))
     expect_equal(vars, c("X1", "X2"))
 
-    expect_error(parse_variables(simple_dt_date, NULL, NULL, "error"))
+    expect_error(parse_variables(simple_dt_date, c(NULL, NULL), "error"))
+})
+
+test_that("parse_names", {
+
+    test_that("returns explicit names unchanged when length matches variables", {
+        names <- parse_names(c("a", "b"), c("X1", "X2"))
+        expect_equal(names, c("a", "b"))
+
+        names <- parse_names("only_one", "X1")
+        expect_equal(names, "only_one")
+    })
+
+    test_that("errors when explicit names length does not match variables", {
+        expect_error(
+            parse_names(c("a", "b", "c"), c("X1", "X2")),
+            "'names' must have same length as 'variables'"
+        )
+        expect_error(parse_names("a", c("X1", "X2")))
+    })
+
+    test_that("NULL names on unique variables returns the variables unchanged", {
+        names <- parse_names(NULL, c("X1", "X2", "Y"))
+        expect_equal(names, c("X1", "X2", "Y"))
+    })
+
+    test_that("NULL names on duplicated variables suffixes the dupes in original order", {
+        names <- parse_names(NULL, c("X1", "X1", "Y"))
+        expect_equal(names, c("X1_1", "X1_2", "Y"))
+
+        names <- parse_names(NULL, c("Y", "X1", "X1"))
+        expect_equal(names, c("Y", "X1_1", "X1_2"))
+
+        names <- parse_names(NULL, c("X1", "Y", "X1", "Y"))
+        expect_equal(names, c("X1_1", "Y_1", "X1_2", "Y_2"))
+    })
 })
 
 test_that("guess_sample_freq", {
