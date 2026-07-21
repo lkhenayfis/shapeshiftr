@@ -1,3 +1,11 @@
+# shapeshiftr 0.5.2
+
+## Bug fixes
+
+* The move to a generic `slice` function left several default behaviors of missing arguments broken.
+  This version reworks the signature of `slice`, the argument parsing pipeline and improves on
+  testing of the whole package.
+
 # shapeshiftr 0.5.1
 
 ## Bug fixes
