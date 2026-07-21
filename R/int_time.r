@@ -68,10 +68,10 @@ seq.int_time <- function(from, to, by, length.out, ...) {
 
     time_from <- decode_int_time(from)
 
-    if (exists("to")) {
+    if (!missing(to)) {
         time_to <- decode_int_time(to)
         aux <- seq(time_from, time_to, by)
-    } else if (exists("length.out")) {
+    } else if (!missing(length.out)) {
         aux <- seq(time_from, by = by, length.out = length.out)
     }
 
@@ -89,3 +89,5 @@ decode_int_time <- function(x) {
 
     return(part1 + part2)
 }
+
+is.numeric.int_time <- function(x) FALSE
