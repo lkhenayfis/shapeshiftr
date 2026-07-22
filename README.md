@@ -6,7 +6,6 @@
 <!-- badges: start -->
 
 [![R-CMD-check](https://github.com/lkhenayfis/shapeshiftr/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/lkhenayfis/shapeshiftr/actions/workflows/R-CMD-check.yaml)
-[![test-coverage](https://github.com/lkhenayfis/shapeshiftr/actions/workflows/test-coverage.yaml/badge.svg)](https://github.com/lkhenayfis/shapeshiftr/actions/workflows/test-coverage.yaml)
 [![codecov](https://codecov.io/gh/lkhenayfis/shapeshiftr/graph/badge.svg?token=JW6LQ7TO2U)](https://codecov.io/gh/lkhenayfis/shapeshiftr)
 <!-- badges: end -->
 
@@ -58,7 +57,7 @@ raw_pipe <- list(
 parsed_pipe <- parse_single_pipe(raw_pipe)
 
 # Evaluate the pipe on the data
-result <- eval_single_pipe(parsed_pipe, env = list(mtcars = mtcars))
+result <- forward_single_pipe(parsed_pipe, env = list(mtcars = mtcars))
 result
 #>       mpg             cyl             disp             hp       
 #>  Min.   :10.40   Min.   :4.000   Min.   : 71.1   Min.   : 52.0  
@@ -113,7 +112,7 @@ raw_pipe <- list(
 
 # Parse and evaluate
 parsed_pipe <- parse_single_pipe(raw_pipe, env = list(mtcars = mtcars), enclos = environment())
-scaled_data <- eval_single_pipe(parsed_pipe, env = list(mtcars = mtcars), enclos = environment())
+scaled_data <- forward_single_pipe(parsed_pipe, env = list(mtcars = mtcars), enclos = environment())
 head(scaled_data)
 #>                          mpg        cyl        disp         hp       drat
 #> Mazda RX4          0.1508848 -0.1049878 -0.57061982 -0.5350928  0.5675137
@@ -160,7 +159,7 @@ raw_pipe <- list(
 
 # Parse and evaluate
 parsed_pipe <- parse_single_pipe(raw_pipe, env = list(mtcars = mtcars), enclos = environment())
-result <- eval_single_pipe(parsed_pipe, env = list(mtcars = mtcars), enclos = environment())
+result <- forward_single_pipe(parsed_pipe, env = list(mtcars = mtcars), enclos = environment())
 result
 #>       mpg             cyl         disp             hp             drat      
 #>  Min.   :17.80   Min.   :6   Min.   :145.0   Min.   :105.0   Min.   :2.760  
@@ -237,11 +236,11 @@ The goal is to forecast “Y” two days ahead using 3 lags of “X1” and
 dataset, we use
 
 ``` r
-lag_X <- slice(obs, "date", variables = c("X1", "X2"), L = -3:-1,
+lag_X <- slice(obs, walk_on = "date", variables = c("X1", "X2"), L = -3:-1,
     names = c("lag_X1", "lag_X2"))
-lead_X <- slice(pred, "date", "target_date", variables = c("X1", "X2"), L = 0:2,
+lead_X <- slice(pred, walk_on = "date", slice_on = "target_date", variables = c("X1", "X2"), L = 0:2,
     names = c("lead_X1", "lead_X2"))
-target <- slice(obs, "date", variables = "Y", L = 2)
+target <- slice(obs, walk_on = "date", variables = "Y", L = 2)
 
 X <- merge(lag_X, lead_X)
 training_data <- merge(X, target)
@@ -330,7 +329,7 @@ gen_closure_slice_simple <- function(x, index_var, variables, L, ...) {
     # The returned closure performs slicing
     # x is the training data but we don't use it here - slicing doesn't need "training"
     function(x) {
-        result <- slice(x, index_var, variables = variables, L = L)
+        result <- slice(x, walk_on = index_var, variables = variables, L = L)
         as.data.table(result)
     }
 }
@@ -368,7 +367,7 @@ parsed_pipe_train <- parse_single_pipe(pipe_def,
     enclos = environment())
 
 # Evaluate on training data
-train_result <- eval_single_pipe(parsed_pipe_train,
+train_result <- forward_single_pipe(parsed_pipe_train,
     env = list(data = train_obs),
     enclos = environment())
 
@@ -414,7 +413,7 @@ parameters from training) on test data:
 ``` r
 # Evaluate the SAME parsed pipe on test data
 # This applies the scaling parameters learned from TRAINING data
-test_result <- eval_single_pipe(parsed_pipe_train,
+test_result <- forward_single_pipe(parsed_pipe_train,
     env = list(data = test_obs),
     enclos = environment())
 
