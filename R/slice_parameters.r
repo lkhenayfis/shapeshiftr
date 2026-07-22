@@ -1,6 +1,8 @@
 
 # SLICE PARAMETERS ---------------------------------------------------------------------------------
 
+#' @keywords internal
+
 parse_slice_args <- function(data, variables, walk_on, slice_on, L, start, step, names) {
 
     walk_on <- parse_index_column(data, walk_on)
@@ -14,6 +16,8 @@ parse_slice_args <- function(data, variables, walk_on, slice_on, L, start, step,
 
     return(params)
 }
+
+#' @keywords internal
 
 new_slice_parameters <- function(variables, walk_on, slice_on, L, slice_times, names) {
     new <- list(
@@ -33,11 +37,15 @@ new_slice_parameters <- function(variables, walk_on, slice_on, L, slice_times, n
 
 # PARSE UTILS --------------------------------------------------------------------------------------
 
+#' @keywords internal
+
 parse_index_column <- function(data, col) {
     if (is.null(col)) col <- guess_index_col(data)
     if (!(col %in% colnames(data))) stop(sprintf("Column '%s' not found in 'data'", col))
     return(col)
 }
+
+#' @keywords internal
 
 guess_index_col <- function(data) {
     candidates <- lapply(data, inherits, what = c("Date", "POSIXct", "POSIXlt"))
@@ -48,6 +56,8 @@ guess_index_col <- function(data) {
     return(guess)
 }
 
+#' @keywords internal
+
 parse_variables <- function(data, index_cols, variables) {
     if (is.null(variables)) {
         variables <- setdiff(names(data), index_cols)
@@ -56,6 +66,8 @@ parse_variables <- function(data, index_cols, variables) {
     }
     return(variables)
 }
+
+#' @keywords internal
 
 parse_names <- function(names, variables) {
     if (!is.null(names)) {
@@ -69,6 +81,8 @@ parse_names <- function(names, variables) {
     names <- names[order(unlist(ord))]
     return(names)
 }
+
+#' @keywords internal
 
 guess_sample_freq <- function(data, column) {
 
@@ -99,6 +113,8 @@ guess_sample_freq <- function(data, column) {
     return(freq)
 }
 
+#' @keywords internal
+
 parse_laglead_times <- function(data, slice_on, L, variables) {
 
     sample_freq <- guess_sample_freq(data, slice_on)
@@ -119,9 +135,15 @@ parse_laglead_times <- function(data, slice_on, L, variables) {
     return(L)
 }
 
+#' @keywords internal
+
 parse_start_time <- function(data, walk_on, start) UseMethod("parse_start_time", start)
 
+#' @keywords internal
+
 parse_start_time.default <- function(data, walk_on, start) return(start)
+
+#' @keywords internal
 
 parse_start_time.character <- function(data, walk_on, start) {
     example <- data[[walk_on]][1]
@@ -135,13 +157,19 @@ parse_start_time.character <- function(data, walk_on, start) {
     return(start)
 }
 
+#' @keywords internal
+
 parse_start_time.numeric <- function(data, walk_on, start) {
     sample_freq <- guess_sample_freq(data, walk_on)
     start <- data[[walk_on]][1] + as.numeric(sample_freq) * (start - 1)
     return(start)
 }
 
+#' @keywords internal
+
 parse_step_time <- function(data, walk_on, step) UseMethod("parse_step_time", step)
+
+#' @keywords internal
 
 parse_step_time.character <- function(data, walk_on, step) {
     sample_freq <- guess_sample_freq(data, walk_on)
@@ -154,11 +182,15 @@ parse_step_time.character <- function(data, walk_on, step) {
     return(step)
 }
 
+#' @keywords internal
+
 parse_step_time.numeric <- function(data, walk_on, step) {
     sample_freq <- guess_sample_freq(data, walk_on)
     step <- as.numeric(sample_freq) * step
     return(step)
 }
+
+#' @keywords internal
 
 parse_slice_times <- function(data, walk_on, start, step) {
     step  <- parse_step_time(data, walk_on, step)

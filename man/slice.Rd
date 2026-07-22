@@ -23,7 +23,7 @@ slice(data, L = -1, start = 1, step = 1, ...)
 
 \method{slice}{ts}(data, L = -1, start = 1, step = 1, ...)
 
-\method{slice}{mts}(data, L = -1, start = 1, step = 1, variables = NULL, ...)
+\method{slice}{mts}(data, L = -1, start = 1, step = 1, variables = NULL, names = NULL, ...)
 }
 \arguments{
 \item{data}{the data.frame-like object on which to operate}

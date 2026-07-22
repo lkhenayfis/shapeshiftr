@@ -1,6 +1,10 @@
 # INT_TIME -----------------------------------------------------------------------------------------
 
+#' @keywords internal
+
 int_time <- function(x, ...) UseMethod("int_time")
+
+#' @keywords internal
 
 int_time.ts <- function(x, ...) {
     times <- as.numeric(time(x))
@@ -8,6 +12,8 @@ int_time.ts <- function(x, ...) {
 
     int_time(times, freq)
 }
+
+#' @keywords internal
 
 int_time.numeric <- function(x, frequency, ...) {
     if (frequency == 1) return(new_int_time(round(x), frequency, 0, x))
@@ -89,5 +95,7 @@ decode_int_time <- function(x) {
 
     return(part1 + part2)
 }
+
+#' @export
 
 is.numeric.int_time <- function(x) FALSE

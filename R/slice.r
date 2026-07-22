@@ -205,7 +205,11 @@ do_slices <- function(data, params) {
     return(slices)
 }
 
+#' @keywords internal
+
 do_single_slice <- function(data, index, params) UseMethod("do_single_slice", params)
+
+#' @keywords internal
 
 do_single_slice.simple_slice_params <- function(data, index, params) {
 
@@ -221,17 +225,25 @@ do_single_slice.simple_slice_params <- function(data, index, params) {
     return(new)
 }
 
+#' @keywords internal
+
 do_single_slice.keyed_slice_params <- function(data, index, params) {
     do_single_slice.simple_slice_params(data[get(params$walk_on) == index], index, params)
 }
 
 # HELPERS ------------------------------------------------------------------------------------------
 
+#' @keywords internal
+
 ts2dt <- function(x) UseMethod("ts2dt")
+
+#' @keywords internal
 
 ts2dt.ts <- function(x) {
     data.table(time = int_time(x), value = as.numeric(x))
 }
+
+#' @keywords internal
 
 ts2dt.mts <- function(x) {
     cbind(data.table(time = int_time(x)), as.matrix(x))
